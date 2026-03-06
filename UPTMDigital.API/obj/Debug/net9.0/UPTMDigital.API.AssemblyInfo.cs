@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("UPTMDigital.API")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+11123962dfe4fbe28d5a7436c549164a79b6879c")]
 [assembly: System.Reflection.AssemblyProductAttribute("UPTMDigital.API")]
 [assembly: System.Reflection.AssemblyTitleAttribute("UPTMDigital.API")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

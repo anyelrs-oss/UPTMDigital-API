@@ -21,10 +21,11 @@ namespace UPTMDigital.API.Controllers
         {
             var log = new List<string>();
 
-            // 1. Update Schema
+            // 1. Update Schema and Apply Migrations
             try
             {
-                log.Add("Schema generation is now handled by EF Core Migrations.");
+                await _context.Database.MigrateAsync();
+                log.Add("Schema generation is now handled by EF Core Migrations and was applied successfully.");
             }
             catch (Exception ex)
             {

@@ -154,3 +154,4 @@ C:\Users\Angel\OneDrive\Documentos\Proyectos\UPTMDigital\UPTMDigital.API\bin\Deb
 C:\Users\Angel\OneDrive\Documentos\Proyectos\UPTMDigital\UPTMDigital.API\bin\Debug\net9.0\publish\UPTMDigital.API.staticwebassets.endpoints.json
 C:\Users\Angel\OneDrive\Documentos\Proyectos\UPTMDigital\UPTMDigital.API\bin\Debug\net9.0\Npgsql.dll
 C:\Users\Angel\OneDrive\Documentos\Proyectos\UPTMDigital\UPTMDigital.API\bin\Debug\net9.0\Npgsql.EntityFrameworkCore.PostgreSQL.dll
+C:\Users\Angel\OneDrive\Documentos\Proyectos\UPTMDigital\UPTMDigital.API\obj\Debug\net9.0\UPTMDigital.API.sourcelink.json
