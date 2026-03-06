@@ -1,0 +1,56 @@
+{
+    "info": {
+        "name": "UPTMDigital API",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "GET Estudiantes",
+            "request": {
+                "method": "GET",
+                "url": "http://localhost:5286/api/estudiantes"
+            }
+        },
+        {
+            "name": "GET Estudiante por ID",
+            "request": {
+                "method": "GET",
+                "url": "http://localhost:5286/api/estudiantes/3"
+            }
+        },
+        {
+            "name": "POST Estudiante",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"cedula\": \"V-98765432\",\n  \"nombres\": \"Ana\",\n  \"apellidos\": \"García\",\n  \"correoInstitucional\": \"ana@uptm.edu.ve\",\n  \"carrera\": \"Fisioterapia\"\n}"
+                },
+                "url": "http://localhost:5286/api/estudiantes"
+            }
+        },
+        {
+            "name": "PUT Estudiante",
+            "request": {
+                "method": "PUT",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"idEstudiante\": 3,\n  \"cedula\": \"V-12345678\",\n  \"nombres\": \"Juan Carlos\",\n  \"apellidos\": \"Pérez Mendoza\",\n  \"correoInstitucional\": \"juan.c@uptm.edu.ve\",\n  \"carrera\": \"Ingeniería en Informática\"\n}"
+                },
+                "url": "http://localhost:5286/api/estudiantes/3"
+            }
+        }
+    ]
+}
