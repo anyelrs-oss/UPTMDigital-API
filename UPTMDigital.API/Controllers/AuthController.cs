@@ -52,6 +52,14 @@ namespace UPTMDigital.API.Controllers
                 return Unauthorized(new { Message = "La contraseña es incorrecta." });
             }
 
+            // Explicitly load role if it's null (sometimes .Include fails on lazy setups)
+            if (usuario.Rol == null && usuario.RolId > 0)
+            {
+                usuario.Rol = await _context.Roles.FindAsync(usuario.RolId);
+            }
+
+            var roleName = usuario.Rol?.NombreRol ?? "Estudiante"; // Fallback to prevent 500
+
             var token = GenerarToken(usuario);
 
             return Ok(new LoginResponseDto
@@ -59,7 +67,7 @@ namespace UPTMDigital.API.Controllers
                 Token = token,
                 Expiracion = DateTime.UtcNow.AddHours(8),
                 NombreUsuario = usuario.NombreUsuario,
-                Rol = usuario.Rol.NombreRol
+                Rol = roleName
             });
         }
 
@@ -70,11 +78,13 @@ namespace UPTMDigital.API.Controllers
 
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
+            var roleName = usuario.Rol?.NombreRol ?? "Estudiante"; // Fallback for safety
+
             var claims = new[]
             {
                 new Claim(ClaimTypes.NameIdentifier, usuario.IdUsuario.ToString()),
                 new Claim(ClaimTypes.Name, usuario.NombreUsuario),
-                new Claim(ClaimTypes.Role, usuario.Rol.NombreRol)
+                new Claim(ClaimTypes.Role, roleName)
             };
 
             var token = new JwtSecurityToken(
