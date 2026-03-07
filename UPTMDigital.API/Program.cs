@@ -68,6 +68,7 @@ var app = builder.Build();
 
 // 4. Middlewares
 app.UseCors("AllowAll");
+app.UseDeveloperExceptionPage(); // temporarily enabled everywhere to debug the 500 error
 
 // Swagger habilitado en todos los entornos (staging/producción en Somee)
 app.UseSwagger();
