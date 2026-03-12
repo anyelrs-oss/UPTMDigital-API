@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using UPTMDigital.API.Data;
 using UPTMDigital.API.Models;
 using System.Security.Claims;
@@ -33,10 +34,39 @@ namespace UPTMDigital.API.Controllers
             var username = User.FindFirst(ClaimTypes.Name)?.Value;
             if (string.IsNullOrEmpty(username)) return Unauthorized();
 
-            var profesor = await _context.Profesores.FirstOrDefaultAsync(p => p.UsuarioLogin == username);
+            Profesor? profesor;
+            try
+            {
+                profesor = await _context.Profesores
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(p => p.UsuarioLogin == username);
+            }
+            catch (Exception ex) when (IsTransientDbException(ex))
+            {
+                return StatusCode(503, new
+                {
+                    message = "Servicio temporalmente no disponible al cargar perfil. Intente de nuevo en unos segundos."
+                });
+            }
+
             if (profesor == null) return NotFound("Profesor profile not linked to this user.");
 
             return profesor;
+        }
+
+        private static bool IsTransientDbException(Exception ex)
+        {
+            if (ex is TimeoutException || ex is NpgsqlException)
+            {
+                return true;
+            }
+
+            if (ex is InvalidOperationException && ex.InnerException is NpgsqlException)
+            {
+                return true;
+            }
+
+            return ex.InnerException is TimeoutException || ex.InnerException is NpgsqlException;
         }
 
         // GET: api/profesores/5

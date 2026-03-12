@@ -8,6 +8,7 @@ using UPTMDigital.API.Data;
 using UPTMDigital.API.DTOs;
 using UPTMDigital.API.Models;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace UPTMDigital.API.Controllers
 {
@@ -31,9 +32,22 @@ namespace UPTMDigital.API.Controllers
         {
             Console.WriteLine($"[LOGIN ATTEMPT] User: {login.NombreUsuario}, Pass: {login.Contrasena}");
 
-            var usuario = await _context.Usuarios
-                .Include(u => u.Rol)
-                .FirstOrDefaultAsync(u => u.NombreUsuario == login.NombreUsuario);
+            Usuario? usuario;
+
+            try
+            {
+                usuario = await _context.Usuarios
+                    .Include(u => u.Rol)
+                    .FirstOrDefaultAsync(u => u.NombreUsuario == login.NombreUsuario);
+            }
+            catch (Exception ex) when (IsTransientDbException(ex))
+            {
+                Console.WriteLine($"[LOGIN RETRYABLE FAILURE] {ex.GetType().Name}: {ex.Message}");
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, new
+                {
+                    Message = "Servicio temporalmente no disponible. Intente de nuevo en unos segundos."
+                });
+            }
 
             if (usuario == null)
             {
@@ -69,6 +83,21 @@ namespace UPTMDigital.API.Controllers
                 NombreUsuario = usuario.NombreUsuario,
                 Rol = roleName
             });
+        }
+
+        private static bool IsTransientDbException(Exception ex)
+        {
+            if (ex is TimeoutException || ex is NpgsqlException)
+            {
+                return true;
+            }
+
+            if (ex is InvalidOperationException && ex.InnerException is NpgsqlException)
+            {
+                return true;
+            }
+
+            return ex.InnerException is TimeoutException || ex.InnerException is NpgsqlException;
         }
 
         private string GenerarToken(Models.Usuario usuario)

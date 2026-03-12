@@ -1,16 +1,63 @@
 // Program.cs
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Npgsql;
+using System.Reflection;
 using System.Text;
 using UPTMDigital.API.Data;
 
 
 var builder = WebApplication.CreateBuilder(args);
+var isDevelopment = builder.Environment.IsDevelopment();
+
+var dbCommandTimeoutSeconds = builder.Configuration.GetValue<int?>("DatabaseResilience:CommandTimeoutSeconds") ?? 45;
+var dbMaxRetryCount = builder.Configuration.GetValue<int?>("DatabaseResilience:MaxRetryCount") ?? 6;
+var dbMaxRetryDelaySeconds = builder.Configuration.GetValue<int?>("DatabaseResilience:MaxRetryDelaySeconds") ?? 15;
+var dbConnectionTimeoutSeconds = builder.Configuration.GetValue<int?>("DatabaseResilience:ConnectionTimeoutSeconds") ?? 15;
+var dbKeepAliveSeconds = builder.Configuration.GetValue<int?>("DatabaseResilience:KeepAliveSeconds") ?? 30;
+var dbMinPoolSize = builder.Configuration.GetValue<int?>("DatabaseResilience:MinPoolSize") ?? 0;
+var dbMaxPoolSize = builder.Configuration.GetValue<int?>("DatabaseResilience:MaxPoolSize") ?? 30;
+
+string BuildResilientConnectionString(string connectionString)
+{
+    if (string.IsNullOrWhiteSpace(connectionString))
+    {
+        return connectionString;
+    }
+
+    var csb = new NpgsqlConnectionStringBuilder(connectionString)
+    {
+        Timeout = dbConnectionTimeoutSeconds,
+        CommandTimeout = dbCommandTimeoutSeconds,
+        KeepAlive = dbKeepAliveSeconds,
+        Pooling = true,
+        MinPoolSize = dbMinPoolSize,
+        MaxPoolSize = dbMaxPoolSize,
+    };
+
+    return csb.ConnectionString;
+}
+
+void ConfigurePostgres(DbContextOptionsBuilder options, string connectionString)
+{
+    var tunedConnectionString = BuildResilientConnectionString(connectionString);
+
+    options.UseNpgsql(tunedConnectionString, npgsqlOptions =>
+    {
+        // Retry transient network and pooler hiccups common in cloud-hosted Postgres.
+        npgsqlOptions.EnableRetryOnFailure(
+            maxRetryCount: dbMaxRetryCount,
+            maxRetryDelay: TimeSpan.FromSeconds(dbMaxRetryDelaySeconds),
+            errorCodesToAdd: null);
+        npgsqlOptions.CommandTimeout(dbCommandTimeoutSeconds);
+    });
+}
 
 // 1. Conexión a la base de datos (App - Render / Supabase en producción)
 builder.Services.AddDbContext<UPTMDigitalContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    ConfigurePostgres(options, builder.Configuration.GetConnectionString("DefaultConnection") ?? string.Empty));
 
 // 1.1 Conexión a la Base Maestro de Nómina (PC Local o Mirror)
 var useMirror = builder.Configuration.GetValue<bool>("NominaConfig:UseMirrorMode");
@@ -19,7 +66,7 @@ var nominaConnStr = useMirror
     : builder.Configuration.GetConnectionString("NominaConnection");
 
 builder.Services.AddDbContext<NominaContext>(options =>
-    options.UseNpgsql(nominaConnStr));
+    ConfigurePostgres(options, nominaConnStr ?? string.Empty));
 
 // 2. Configuración JWT
 var key = Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]
@@ -49,38 +96,110 @@ builder.Services.AddAuthentication(x =>
 // 3. Servicios estándar
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// 3.1 CORS (Permitir todo para desarrollo)
+// 3.0 Render / reverse proxy support
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
+// 3.1 CORS
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll",
-        builder =>
+    options.AddPolicy("DefaultCors", policy =>
+    {
+        if (allowedOrigins.Length == 0)
         {
-            builder.AllowAnyOrigin()
-                   .AllowAnyMethod()
-                   .AllowAnyHeader();
-        });
+            // Fallback for quick local setup.
+            policy.AllowAnyOrigin()
+                  .AllowAnyMethod()
+                  .AllowAnyHeader();
+            return;
+        }
+
+        policy.WithOrigins(allowedOrigins)
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
 });
 
 var app = builder.Build();
 
+static bool IsTransientDbException(Exception ex)
+{
+    if (ex is TimeoutException || ex is NpgsqlException)
+    {
+        return true;
+    }
+
+    if (ex is InvalidOperationException && ex.InnerException is NpgsqlException)
+    {
+        return true;
+    }
+
+    return ex.InnerException is TimeoutException || ex.InnerException is NpgsqlException;
+}
+
 // 4. Middlewares
-app.UseCors("AllowAll");
-app.UseDeveloperExceptionPage(); // temporarily enabled everywhere to debug the 500 error
+app.UseForwardedHeaders();
+
+if (isDevelopment)
+{
+    app.UseDeveloperExceptionPage();
+}
+
+// Return a controlled 503 for transient DB failures instead of exposing 500 stack traces.
+app.Use(async (context, next) =>
+{
+    try
+    {
+        await next();
+    }
+    catch (Exception ex) when (IsTransientDbException(ex))
+    {
+        context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+        await context.Response.WriteAsJsonAsync(new
+        {
+            message = "Servicio temporalmente no disponible por latencia de base de datos. Intente nuevamente en unos segundos."
+        });
+    }
+});
+
+app.UseCors("DefaultCors");
 
 // Swagger habilitado en todos los entornos (staging/producción en Somee)
 app.UseSwagger();
 app.UseSwaggerUI();
 
-// app.UseHttpsRedirection();
+if (!isDevelopment)
+{
+    app.UseHsts();
+    app.UseHttpsRedirection();
+}
 
 // 5. AUTENTICACIÓN Y AUTORIZACIÓN (orden importante)
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapGet("/health", () => Results.Ok(new { status = "ok", env = app.Environment.EnvironmentName }));
+app.MapGet("/api/health", () => Results.Ok(new { status = "ok", env = app.Environment.EnvironmentName }));
+app.MapGet("/api/version", () => Results.Ok(new
+{
+    app = "UPTMDigital.API",
+    environment = app.Environment.EnvironmentName,
+    version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "unknown",
+    features = new[]
+    {
+        "db-resilience",
+        "transient-db-503",
+        "setup-seed-test-users"
+    }
+}));
 
 // SEEDING AUTOMÁTICO REMOVED TO PREVENT DATA LOSS
 // Use /api/setup/apply-changes endpoint instead.

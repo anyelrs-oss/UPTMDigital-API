@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using UPTMDigital.API.Data;
 using UPTMDigital.API.Models;
 
@@ -11,9 +12,218 @@ namespace UPTMDigital.API.Controllers
     {
         private readonly UPTMDigitalContext _context;
 
+        public sealed class SeedAuthRequest
+        {
+            public string Username { get; set; } = "tester1";
+            public string Password { get; set; } = "123456";
+            public string RoleName { get; set; } = "Estudiante";
+        }
+
         public SetupController(UPTMDigitalContext context)
         {
             _context = context;
+        }
+
+        [HttpPost("seed-test-users")]
+        public async Task<IActionResult> SeedTestUsers()
+        {
+            var log = new List<string>();
+
+            var strategy = _context.Database.CreateExecutionStrategy();
+            try
+            {
+                await strategy.ExecuteAsync(async () =>
+                {
+                    await using var tx = await _context.Database.BeginTransactionAsync();
+
+                    await EnsureRoleAsync("Administrador");
+                    await EnsureRoleAsync("Profesor");
+                    await EnsureRoleAsync("Estudiante");
+                    await EnsureRoleAsync("Seguridad");
+
+                    await EnsureUserWithRoleAsync("tester_admin", "123456", "Administrador", log);
+                    await EnsureUserWithRoleAsync("tester_seg", "123456", "Seguridad", log);
+                    await EnsureUserWithRoleAsync("tester_prof", "123456", "Profesor", log);
+                    await EnsureUserWithRoleAsync("tester_est", "123456", "Estudiante", log);
+
+                    await EnsureProfesorProfileAsync("tester_prof", log);
+                    await EnsureEstudianteProfileAsync("tester_est", log);
+
+                    await _context.SaveChangesAsync();
+                    await tx.CommitAsync();
+                });
+            }
+            catch (Exception ex) when (IsTransientDbException(ex))
+            {
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, new
+                {
+                    message = "No se pudo sembrar usuarios de prueba por una falla transitoria de base de datos. Reintente en unos segundos.",
+                    detail = ex.Message
+                });
+            }
+
+            return Ok(new
+            {
+                message = "Test users seeded/updated.",
+                credentials = new[]
+                {
+                    new { username = "tester_admin", password = "123456", role = "Administrador" },
+                    new { username = "tester_seg", password = "123456", role = "Seguridad" },
+                    new { username = "tester_prof", password = "123456", role = "Profesor" },
+                    new { username = "tester_est", password = "123456", role = "Estudiante" }
+                },
+                log
+            });
+        }
+
+        private static bool IsTransientDbException(Exception ex)
+        {
+            if (ex is TimeoutException || ex is NpgsqlException)
+            {
+                return true;
+            }
+
+            if (ex is InvalidOperationException && ex.InnerException is NpgsqlException)
+            {
+                return true;
+            }
+
+            return ex.InnerException is TimeoutException || ex.InnerException is NpgsqlException;
+        }
+
+        [HttpPost("seed-auth-test")]
+        public async Task<IActionResult> SeedAuthTest([FromBody] SeedAuthRequest? request)
+        {
+            var payload = request ?? new SeedAuthRequest();
+            var roleName = string.IsNullOrWhiteSpace(payload.RoleName) ? "Estudiante" : payload.RoleName.Trim();
+
+            var role = await _context.Roles.FirstOrDefaultAsync(r => r.NombreRol == roleName);
+            if (role == null)
+            {
+                role = new Rol { NombreRol = roleName };
+                _context.Roles.Add(role);
+                await _context.SaveChangesAsync();
+            }
+
+            var existing = await _context.Usuarios.FirstOrDefaultAsync(u => u.NombreUsuario == payload.Username);
+            if (existing != null)
+            {
+                existing.ContrasenaHash = payload.Password;
+                existing.RolId = role.IdRol;
+                existing.EstadoCuenta = true;
+                existing.UltimoAcceso = DateTime.UtcNow;
+                _context.Entry(existing).State = EntityState.Modified;
+                await _context.SaveChangesAsync();
+
+                return Ok(new
+                {
+                    message = "Test user updated.",
+                    username = existing.NombreUsuario,
+                    role = role.NombreRol,
+                    password = payload.Password
+                });
+            }
+
+            var user = new Usuario
+            {
+                NombreUsuario = payload.Username,
+                ContrasenaHash = payload.Password,
+                RolId = role.IdRol,
+                EstadoCuenta = true,
+                UltimoAcceso = DateTime.UtcNow
+            };
+
+            _context.Usuarios.Add(user);
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = "Test user created.",
+                username = user.NombreUsuario,
+                role = role.NombreRol,
+                password = payload.Password
+            });
+        }
+
+        private async Task EnsureRoleAsync(string roleName)
+        {
+            if (!await _context.Roles.AnyAsync(r => r.NombreRol == roleName))
+            {
+                _context.Roles.Add(new Rol { NombreRol = roleName });
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        private async Task EnsureUserWithRoleAsync(string username, string password, string roleName, List<string> log)
+        {
+            var role = await _context.Roles.FirstAsync(r => r.NombreRol == roleName);
+            var user = await _context.Usuarios.FirstOrDefaultAsync(u => u.NombreUsuario == username);
+
+            if (user == null)
+            {
+                user = new Usuario
+                {
+                    NombreUsuario = username,
+                    ContrasenaHash = password,
+                    RolId = role.IdRol,
+                    EstadoCuenta = true,
+                    UltimoAcceso = DateTime.UtcNow
+                };
+                _context.Usuarios.Add(user);
+                log.Add($"Created user '{username}' with role '{roleName}'.");
+                return;
+            }
+
+            user.ContrasenaHash = password;
+            user.RolId = role.IdRol;
+            user.EstadoCuenta = true;
+            user.UltimoAcceso = DateTime.UtcNow;
+            _context.Entry(user).State = EntityState.Modified;
+            log.Add($"Updated user '{username}' with role '{roleName}'.");
+        }
+
+        private async Task EnsureProfesorProfileAsync(string username, List<string> log)
+        {
+            var profile = await _context.Profesores.FirstOrDefaultAsync(p => p.UsuarioLogin == username);
+            if (profile != null)
+            {
+                return;
+            }
+
+            _context.Profesores.Add(new Profesor
+            {
+                Cedula = "V-44444444",
+                Nombres = "Test",
+                Apellidos = "Profesor",
+                CorreoInstitucional = "tester.prof@uptm.edu.ve",
+                Departamento = "Informatica",
+                Telefono = "0412-4444444",
+                UsuarioLogin = username
+            });
+            log.Add($"Created professor profile linked to '{username}'.");
+        }
+
+        private async Task EnsureEstudianteProfileAsync(string username, List<string> log)
+        {
+            var profile = await _context.Estudiantes.FirstOrDefaultAsync(e => e.UsuarioLogin == username);
+            if (profile != null)
+            {
+                return;
+            }
+
+            _context.Estudiantes.Add(new Estudiante
+            {
+                Cedula = "V-55555555",
+                Nombres = "Test",
+                Apellidos = "Estudiante",
+                CorreoInstitucional = "tester.est@uptm.edu.ve",
+                Carrera = "Informatica",
+                Direccion = "Merida",
+                Telefono = "0412-5555555",
+                FechaRegistro = DateTime.UtcNow,
+                UsuarioLogin = username
+            });
+            log.Add($"Created student profile linked to '{username}'.");
         }
 
         [HttpPost("apply-changes")]
@@ -37,8 +247,10 @@ namespace UPTMDigital.API.Controllers
             {
                 // 1.1 Seed Roles (Critical for User Creation)
                 var rolesNames = new[] { "Administrador", "Profesor", "Estudiante", "Seguridad" };
-                foreach (var rName in rolesNames) {
-                    if (!await _context.Roles.AnyAsync(r => r.NombreRol == rName)) {
+                foreach (var rName in rolesNames)
+                {
+                    if (!await _context.Roles.AnyAsync(r => r.NombreRol == rName))
+                    {
                         _context.Roles.Add(new Rol { NombreRol = rName });
                     }
                 }
@@ -46,14 +258,15 @@ namespace UPTMDigital.API.Controllers
                 log.Add("Ensured Roles exist.");
                 // Ensure users exist
                 var profesorUser = await _context.Usuarios.FirstOrDefaultAsync(u => u.NombreUsuario == "profesor1");
-                if (profesorUser == null) 
+                if (profesorUser == null)
                 {
-                     var rolProf = await _context.Roles.FirstOrDefaultAsync(r => r.NombreRol == "Profesor");
-                     if (rolProf == null) {
-                         rolProf = new Rol { NombreRol = "Profesor" };
-                         _context.Roles.Add(rolProf);
-                         await _context.SaveChangesAsync();
-                     }
+                    var rolProf = await _context.Roles.FirstOrDefaultAsync(r => r.NombreRol == "Profesor");
+                    if (rolProf == null)
+                    {
+                        rolProf = new Rol { NombreRol = "Profesor" };
+                        _context.Roles.Add(rolProf);
+                        await _context.SaveChangesAsync();
+                    }
 
                     profesorUser = new Usuario { NombreUsuario = "profesor1", ContrasenaHash = "123456", RolId = rolProf.IdRol, EstadoCuenta = true, UltimoAcceso = DateTime.Now };
                     _context.Usuarios.Add(profesorUser);
@@ -64,14 +277,19 @@ namespace UPTMDigital.API.Controllers
                 // Ensure Profile
                 if (!await _context.Profesores.AnyAsync(p => p.UsuarioLogin == "profesor1"))
                 {
-                     var newProf = new Profesor { 
-                            Cedula = "V-99999991", Nombres = "Juan", Apellidos = "Profesor", 
-                            CorreoInstitucional = "juan@uptm.edu.ve", Telefono = "0412-1111111", UsuarioLogin = "profesor1",
-                            Departamento = "Informatica"
-                     };
-                     _context.Profesores.Add(newProf);
-                     await _context.SaveChangesAsync();
-                     log.Add("Created Professor profile for 'profesor1'");
+                    var newProf = new Profesor
+                    {
+                        Cedula = "V-99999991",
+                        Nombres = "Juan",
+                        Apellidos = "Profesor",
+                        CorreoInstitucional = "juan@uptm.edu.ve",
+                        Telefono = "0412-1111111",
+                        UsuarioLogin = "profesor1",
+                        Departamento = "Informatica"
+                    };
+                    _context.Profesores.Add(newProf);
+                    await _context.SaveChangesAsync();
+                    log.Add("Created Professor profile for 'profesor1'");
                 }
 
                 var estudianteUser = await _context.Usuarios.FirstOrDefaultAsync(u => u.NombreUsuario == "estudiante1");
@@ -118,9 +336,11 @@ namespace UPTMDigital.API.Controllers
 
                 // FORCE PASSWORD RESET FOR DEBUGGING (Since AuthController uses plain text check)
                 var usersToReset = new[] { "profesor1", "profesor2", "estudiante1", "estudiante2", "seguridad1" };
-                foreach (var uname in usersToReset) {
+                foreach (var uname in usersToReset)
+                {
                     var u = await _context.Usuarios.FirstOrDefaultAsync(x => x.NombreUsuario == uname);
-                    if (u != null) {
+                    if (u != null)
+                    {
                         u.ContrasenaHash = "123456"; // Plain text as expected by AuthController.cs
                         _context.Entry(u).State = EntityState.Modified;
                     }
@@ -134,16 +354,22 @@ namespace UPTMDigital.API.Controllers
                 if (prof2User == null)
                 {
                     var rolProf = await _context.Roles.FirstOrDefaultAsync(r => r.NombreRol == "Profesor");
-                    if (rolProf != null) {
+                    if (rolProf != null)
+                    {
                         prof2User = new Usuario { NombreUsuario = "profesor2", ContrasenaHash = "123456", RolId = rolProf.IdRol };
                         _context.Usuarios.Add(prof2User);
                         await _context.SaveChangesAsync();
                         log.Add("Created user 'profesor2'");
-                        
+
                         // Create associated Professor entity
-                        var newProf = new Profesor { 
-                            Cedula = "V-22222222", Nombres = "Maria Perez", Apellidos = "Docente", 
-                            CorreoInstitucional = "maria@uptm.edu.ve", Telefono = "0412-2222222", UsuarioLogin = "profesor2" 
+                        var newProf = new Profesor
+                        {
+                            Cedula = "V-22222222",
+                            Nombres = "Maria Perez",
+                            Apellidos = "Docente",
+                            CorreoInstitucional = "maria@uptm.edu.ve",
+                            Telefono = "0412-2222222",
+                            UsuarioLogin = "profesor2"
                         };
                         _context.Profesores.Add(newProf);
                         await _context.SaveChangesAsync();
@@ -156,16 +382,22 @@ namespace UPTMDigital.API.Controllers
                 if (est2User == null)
                 {
                     var rolEst = await _context.Roles.FirstOrDefaultAsync(r => r.NombreRol == "Estudiante");
-                    if (rolEst != null) {
+                    if (rolEst != null)
+                    {
                         est2User = new Usuario { NombreUsuario = "estudiante2", ContrasenaHash = "123456", RolId = rolEst.IdRol };
                         _context.Usuarios.Add(est2User);
                         await _context.SaveChangesAsync();
                         log.Add("Created user 'estudiante2'");
 
                         // Create associated Student entity
-                        var newEst = new Estudiante { 
-                            Cedula = "V-33333333", Nombres = "Carlos Ruiz", Apellidos = "Alumno", 
-                            CorreoInstitucional = "carlos@uptm.edu.ve", Direccion = "Centro", UsuarioLogin = "estudiante2" 
+                        var newEst = new Estudiante
+                        {
+                            Cedula = "V-33333333",
+                            Nombres = "Carlos Ruiz",
+                            Apellidos = "Alumno",
+                            CorreoInstitucional = "carlos@uptm.edu.ve",
+                            Direccion = "Centro",
+                            UsuarioLogin = "estudiante2"
                         };
                         _context.Estudiantes.Add(newEst);
                         await _context.SaveChangesAsync();
@@ -178,7 +410,8 @@ namespace UPTMDigital.API.Controllers
                 if (seg1User == null)
                 {
                     var rolSeg = await _context.Roles.FirstOrDefaultAsync(r => r.NombreRol == "Seguridad");
-                    if (rolSeg != null) {
+                    if (rolSeg != null)
+                    {
                         seg1User = new Usuario { NombreUsuario = "seguridad1", ContrasenaHash = "123456", RolId = rolSeg.IdRol, EstadoCuenta = true, UltimoAcceso = DateTime.Now };
                         _context.Usuarios.Add(seg1User);
                         await _context.SaveChangesAsync();
@@ -190,7 +423,7 @@ namespace UPTMDigital.API.Controllers
                 log.Add("Users verified/created.");
 
                 // 3. Seed Content Data (Anuncios, Asignaturas, Inscripciones, Notas)
-                
+
                 // 3.1 Anuncios
                 if (!await _context.Anuncios.AnyAsync())
                 {
@@ -210,15 +443,17 @@ namespace UPTMDigital.API.Controllers
 
                 if (p1 != null && p2 != null && e1 != null && e2 != null)
                 {
-                    
+
                     // Tables should exist via EF Core Migrations or ensureCreated
 
 
                     // 3.2 Asignaturas (Expanded)
                     // Helper to create if not exists
-                    async Task<Asignatura> EnsureAsignatura(string code, string name, int sem, int cred, int profId) {
+                    async Task<Asignatura> EnsureAsignatura(string code, string name, int sem, int cred, int profId)
+                    {
                         var a = await _context.Asignaturas.FirstOrDefaultAsync(x => x.Codigo == code);
-                        if (a == null) {
+                        if (a == null)
+                        {
                             a = new Asignatura { Codigo = code, Nombre = name, Semestre = sem, Creditos = cred, Departamento = "General", ProfesorId = profId };
                             _context.Asignaturas.Add(a);
                         }
@@ -230,12 +465,13 @@ namespace UPTMDigital.API.Controllers
                     var asig3 = await EnsureAsignatura("BD201", "Base de Datos", 2, 3, p1.IdProfesor);
                     var asig4 = await EnsureAsignatura("ING101", "Ingles I", 1, 2, p2.IdProfesor);
                     var asig5 = await EnsureAsignatura("FIS101", "Fisica I", 1, 3, p1.IdProfesor);
-                    
+
                     await _context.SaveChangesAsync();
                     log.Add("Ensured Asignaturas (5 subjects) exist.");
 
                     // 3.3 Inscripciones (Expanded)
-                    async Task EnsureInscripcion(int estId, int asigId) {
+                    async Task EnsureInscripcion(int estId, int asigId)
+                    {
                         if (!await _context.Inscripciones.AnyAsync(i => i.EstudianteId == estId && i.AsignaturaId == asigId))
                             _context.Inscripciones.Add(new Inscripcion { EstudianteId = estId, AsignaturaId = asigId, Periodo = "2025-I", FechaInscripcion = DateTime.Now, Estado = "Inscrito" });
                     }
@@ -249,45 +485,49 @@ namespace UPTMDigital.API.Controllers
                     // E2: Mixed
                     await EnsureInscripcion(e2.IdEstudiante, asig1.IdAsignatura);
                     await EnsureInscripcion(e2.IdEstudiante, asig3.IdAsignatura); // BD is sem 2, advanced student
-                    
+
                     log.Add("Seeded/Verified Inscripciones.");
 
                     // 3.4 Notas (Expanded)
-                    if (!await _context.Notas.AnyAsync()) {
-                         _context.Notas.AddRange(
-                            new Nota { EstudianteId = e1.IdEstudiante, AsignaturaId = asig1.IdAsignatura, Calificacion = 18, ProfesorId = p1.IdProfesor, CodigoQR = "QR-MAT-001", Fecha = DateTime.Now.AddDays(-10) },
-                            new Nota { EstudianteId = e1.IdEstudiante, AsignaturaId = asig2.IdAsignatura, Calificacion = 16, ProfesorId = p2.IdProfesor, CodigoQR = "QR-PROG-001", Fecha = DateTime.Now.AddDays(-5) },
-                            new Nota { EstudianteId = e2.IdEstudiante, AsignaturaId = asig3.IdAsignatura, Calificacion = 15, ProfesorId = p1.IdProfesor, CodigoQR = "QR-BD-001", Fecha = DateTime.Now.AddDays(-2) }
-                        );
+                    if (!await _context.Notas.AnyAsync())
+                    {
+                        _context.Notas.AddRange(
+                           new Nota { EstudianteId = e1.IdEstudiante, AsignaturaId = asig1.IdAsignatura, Calificacion = 18, ProfesorId = p1.IdProfesor, CodigoQR = "QR-MAT-001", Fecha = DateTime.Now.AddDays(-10) },
+                           new Nota { EstudianteId = e1.IdEstudiante, AsignaturaId = asig2.IdAsignatura, Calificacion = 16, ProfesorId = p2.IdProfesor, CodigoQR = "QR-PROG-001", Fecha = DateTime.Now.AddDays(-5) },
+                           new Nota { EstudianteId = e2.IdEstudiante, AsignaturaId = asig3.IdAsignatura, Calificacion = 15, ProfesorId = p1.IdProfesor, CodigoQR = "QR-BD-001", Fecha = DateTime.Now.AddDays(-2) }
+                       );
                         log.Add("Seeded initial Notas.");
                     }
 
                     // 3.5 Mensajes (Expanded)
-                    if (!await _context.Mensajes.AnyAsync(m => m.AsignaturaId == asig2.IdAsignatura)) {
-                         _context.Mensajes.AddRange(
-                            new Mensaje { AsignaturaId = asig2.IdAsignatura, Contenido = "Bienvenidos al curso de Programación I", FechaEnvio = DateTime.Now.AddDays(-10), EmisorNombre = p2.Nombres + " " + p2.Apellidos },
-                            new Mensaje { AsignaturaId = asig2.IdAsignatura, Contenido = "Recuerden instalar Visual Studio Code", FechaEnvio = DateTime.Now.AddDays(-8), EmisorNombre = p2.Nombres + " " + p2.Apellidos },
-                            new Mensaje { AsignaturaId = asig2.IdAsignatura, Contenido = "¿Cuándo es el primer examen?", FechaEnvio = DateTime.Now.AddDays(-7), EmisorNombre = e1.Nombres + " " + e1.Apellidos }
-                         );
-                         log.Add("Seeded messages for PROG101.");
+                    if (!await _context.Mensajes.AnyAsync(m => m.AsignaturaId == asig2.IdAsignatura))
+                    {
+                        _context.Mensajes.AddRange(
+                           new Mensaje { AsignaturaId = asig2.IdAsignatura, Contenido = "Bienvenidos al curso de Programación I", FechaEnvio = DateTime.Now.AddDays(-10), EmisorNombre = p2.Nombres + " " + p2.Apellidos },
+                           new Mensaje { AsignaturaId = asig2.IdAsignatura, Contenido = "Recuerden instalar Visual Studio Code", FechaEnvio = DateTime.Now.AddDays(-8), EmisorNombre = p2.Nombres + " " + p2.Apellidos },
+                           new Mensaje { AsignaturaId = asig2.IdAsignatura, Contenido = "¿Cuándo es el primer examen?", FechaEnvio = DateTime.Now.AddDays(-7), EmisorNombre = e1.Nombres + " " + e1.Apellidos }
+                        );
+                        log.Add("Seeded messages for PROG101.");
                     }
 
                     // 3.6 Horarios (Expanded)
-                    if (!await _context.Horarios.AnyAsync()) {
-                         _context.Horarios.AddRange(
-                            new Horario { AsignaturaId = asig1.IdAsignatura, Dia = "Lunes", HoraInicio = "08:00", HoraFin = "10:00", Aula = "Lab 1" },
-                            new Horario { AsignaturaId = asig1.IdAsignatura, Dia = "Miercoles", HoraInicio = "08:00", HoraFin = "10:00", Aula = "Aula 12" },
-                            new Horario { AsignaturaId = asig2.IdAsignatura, Dia = "Martes", HoraInicio = "10:00", HoraFin = "12:00", Aula = "Lab 2" },
-                            new Horario { AsignaturaId = asig2.IdAsignatura, Dia = "Jueves", HoraInicio = "10:00", HoraFin = "12:00", Aula = "Lab 2" },
-                            new Horario { AsignaturaId = asig3.IdAsignatura, Dia = "Viernes", HoraInicio = "14:00", HoraFin = "16:00", Aula = "Aula 5" },
-                            new Horario { AsignaturaId = asig4.IdAsignatura, Dia = "Lunes", HoraInicio = "14:00", HoraFin = "16:00", Aula = "Aula 3" },
-                            new Horario { AsignaturaId = asig5.IdAsignatura, Dia = "Miercoles", HoraInicio = "10:00", HoraFin = "12:00", Aula = "Lab Fisica" }
-                         );
-                         log.Add("Seeded Schedules (Horarios) for all subjects.");
+                    if (!await _context.Horarios.AnyAsync())
+                    {
+                        _context.Horarios.AddRange(
+                           new Horario { AsignaturaId = asig1.IdAsignatura, Dia = "Lunes", HoraInicio = "08:00", HoraFin = "10:00", Aula = "Lab 1" },
+                           new Horario { AsignaturaId = asig1.IdAsignatura, Dia = "Miercoles", HoraInicio = "08:00", HoraFin = "10:00", Aula = "Aula 12" },
+                           new Horario { AsignaturaId = asig2.IdAsignatura, Dia = "Martes", HoraInicio = "10:00", HoraFin = "12:00", Aula = "Lab 2" },
+                           new Horario { AsignaturaId = asig2.IdAsignatura, Dia = "Jueves", HoraInicio = "10:00", HoraFin = "12:00", Aula = "Lab 2" },
+                           new Horario { AsignaturaId = asig3.IdAsignatura, Dia = "Viernes", HoraInicio = "14:00", HoraFin = "16:00", Aula = "Aula 5" },
+                           new Horario { AsignaturaId = asig4.IdAsignatura, Dia = "Lunes", HoraInicio = "14:00", HoraFin = "16:00", Aula = "Aula 3" },
+                           new Horario { AsignaturaId = asig5.IdAsignatura, Dia = "Miercoles", HoraInicio = "10:00", HoraFin = "12:00", Aula = "Lab Fisica" }
+                        );
+                        log.Add("Seeded Schedules (Horarios) for all subjects.");
                     }
 
                     // 3.7 Asistencias (New)
-                    if (!await _context.Asistencias.AnyAsync()) {
+                    if (!await _context.Asistencias.AnyAsync())
+                    {
                         _context.Asistencias.AddRange(
                             new Asistencia { EstudianteId = e1.IdEstudiante, AsignaturaId = asig1.IdAsignatura, Fecha = DateTime.Now.AddDays(-7), Estado = "Presente" },
                             new Asistencia { EstudianteId = e1.IdEstudiante, AsignaturaId = asig1.IdAsignatura, Fecha = DateTime.Now.AddDays(-2), Estado = "Ausente" },
@@ -297,34 +537,36 @@ namespace UPTMDigital.API.Controllers
                     }
 
                     // 3.8 Constancias (New)
-                    if (!await _context.Constancias.AnyAsync()) {
+                    if (!await _context.Constancias.AnyAsync())
+                    {
                         _context.Constancias.Add(
                             new Constancia { EstudianteId = e1.IdEstudiante, TipoConstancia = "Estudio", FechaSolicitud = DateTime.Now.AddMonths(-1), ArchivoUrl = "https://example.com/constancia1.pdf", Estado = "Emitida" }
                         );
                         log.Add("Seeded Constancias.");
                     }
-                
+
                 }
-                
+
                 // --- REGISTRO INSTITUCIONAL (MOCK) ---
-                    // Tables should exist via EF Core migrations
+                // Tables should exist via EF Core migrations
 
-                    if (!await _context.RegistrosInstitucionales.AnyAsync()) {
-                        _context.RegistrosInstitucionales.AddRange(
-                            // Unregistered Students
-                            new RegistroInstitucional { Cedula = "V-20000001", Nombres = "Diego", Apellidos = "Martinez", CarreraDepartamento = "Informatica", RolEsperado = "Estudiante", CorreoInstitucional = "diego@uptm.edu.ve" },
-                            new RegistroInstitucional { Cedula = "V-20000002", Nombres = "Laura", Apellidos = "Sofia", CarreraDepartamento = "Administracion", RolEsperado = "Estudiante", CorreoInstitucional = "laura@uptm.edu.ve" },
-                            // Unregistered Professor
-                            new RegistroInstitucional { Cedula = "V-10000001", Nombres = "Roberto", Apellidos = "Gomez", CarreraDepartamento = "Matematica", RolEsperado = "Profesor", CorreoInstitucional = "roberto@uptm.edu.ve" }
-                        );
-                        log.Add("Seeded RegistroInstitucional with 3 mock records.");
-                    }
+                if (!await _context.RegistrosInstitucionales.AnyAsync())
+                {
+                    _context.RegistrosInstitucionales.AddRange(
+                        // Unregistered Students
+                        new RegistroInstitucional { Cedula = "V-20000001", Nombres = "Diego", Apellidos = "Martinez", CarreraDepartamento = "Informatica", RolEsperado = "Estudiante", CorreoInstitucional = "diego@uptm.edu.ve" },
+                        new RegistroInstitucional { Cedula = "V-20000002", Nombres = "Laura", Apellidos = "Sofia", CarreraDepartamento = "Administracion", RolEsperado = "Estudiante", CorreoInstitucional = "laura@uptm.edu.ve" },
+                        // Unregistered Professor
+                        new RegistroInstitucional { Cedula = "V-10000001", Nombres = "Roberto", Apellidos = "Gomez", CarreraDepartamento = "Matematica", RolEsperado = "Profesor", CorreoInstitucional = "roberto@uptm.edu.ve" }
+                    );
+                    log.Add("Seeded RegistroInstitucional with 3 mock records.");
+                }
 
-                    await _context.SaveChangesAsync();
+                await _context.SaveChangesAsync();
             }
             catch (Exception ex)
             {
-                 log.Add($"Data linking error: {ex.Message}");
+                log.Add($"Data linking error: {ex.Message}");
             }
 
             return Ok(new { Message = "Setup completed", Log = log });

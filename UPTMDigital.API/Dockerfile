@@ -15,5 +15,9 @@ FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
 WORKDIR /app
 COPY --from=build /app/publish .
 
+# Defaults for cloud deployment stability (can still be overridden by host env vars).
+ENV ASPNETCORE_ENVIRONMENT=Production
+ENV DOTNET_SYSTEM_NET_DISABLEIPV6=1
+
 # Render inyecta la variable de entorno PORT. El binding se hace en Program.cs.
 ENTRYPOINT ["dotnet", "UPTMDigital.API.dll"]
