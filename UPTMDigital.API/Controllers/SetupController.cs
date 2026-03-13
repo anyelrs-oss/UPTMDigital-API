@@ -230,11 +230,8 @@ namespace UPTMDigital.API.Controllers
         public async Task<IActionResult> SeedFullData()
         {
             var log = new List<string>();
-            var strategy = _context.Database.CreateExecutionStrategy();
             try
             {
-                await strategy.ExecuteAsync(async () =>
-                {
                     // ── 1. ROLES ─────────────────────────────────────────────────────────
                     foreach (var r in new[] { "Administrador", "Profesor", "Estudiante", "Seguridad" })
                         if (!await _context.Roles.AnyAsync(x => x.NombreRol == r))
@@ -469,7 +466,6 @@ namespace UPTMDigital.API.Controllers
                         await _context.SaveChangesAsync();
                         log.Add("RegistrosInstitucionales: 5 creados.");
                     }
-                });
             }
             catch (Exception ex) when (IsTransientDbException(ex))
             {
