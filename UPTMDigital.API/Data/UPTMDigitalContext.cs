@@ -27,5 +27,6 @@ namespace UPTMDigital.API.Data
         public DbSet<Carrera> Carreras { get; set; } = null!;
         public DbSet<Semestre> Semestres { get; set; } = null!;
         public DbSet<Periodo> Periodos { get; set; } = null!;
+        public DbSet<Notificacion> Notificaciones { get; set; } = null!;
     }
 }

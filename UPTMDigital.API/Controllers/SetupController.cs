@@ -226,272 +226,253 @@ namespace UPTMDigital.API.Controllers
             log.Add($"Created student profile linked to '{username}'.");
         }
 
-        [HttpPost("seed-full-data")]
-        public async Task<IActionResult> SeedFullData()
+        // ── SEED PASO 1: Roles + Profesores + Estudiantes ────────────────────────
+        [HttpPost("seed-base")]
+        public async Task<IActionResult> SeedBase()
         {
             var log = new List<string>();
             try
             {
-                    // ── 1. ROLES ─────────────────────────────────────────────────────────
-                    foreach (var r in new[] { "Administrador", "Profesor", "Estudiante", "Seguridad" })
-                        if (!await _context.Roles.AnyAsync(x => x.NombreRol == r))
-                        { _context.Roles.Add(new Rol { NombreRol = r }); }
-                    await _context.SaveChangesAsync();
+                foreach (var r in new[] { "Administrador", "Profesor", "Estudiante", "Seguridad" })
+                    if (!await _context.Roles.AnyAsync(x => x.NombreRol == r))
+                        _context.Roles.Add(new Rol { NombreRol = r });
+                await _context.SaveChangesAsync();
+                log.Add("Roles OK.");
 
-                    var rolProf = await _context.Roles.FirstAsync(r => r.NombreRol == "Profesor");
-                    var rolEst  = await _context.Roles.FirstAsync(r => r.NombreRol == "Estudiante");
-                    var rolAdm  = await _context.Roles.FirstAsync(r => r.NombreRol == "Administrador");
-                    var rolSeg  = await _context.Roles.FirstAsync(r => r.NombreRol == "Seguridad");
+                var rolProf = await _context.Roles.FirstAsync(r => r.NombreRol == "Profesor");
+                var rolEst  = await _context.Roles.FirstAsync(r => r.NombreRol == "Estudiante");
 
-                    // ── 2. PROFESORES ─────────────────────────────────────────────────────
-                    var profData = new[]
-                    {
-                        new { Login="prof_garcia",    Pass="123456", Cedula="V-12345678", Nombres="Carlos",    Apellidos="García",    Correo="c.garcia@uptm.edu.ve",    Depto="Informática",  Cod="P001", Tel="0412-1234567" },
-                        new { Login="prof_mendoza",   Pass="123456", Cedula="V-18765432", Nombres="María",     Apellidos="Mendoza",  Correo="m.mendoza@uptm.edu.ve",   Depto="Matemáticas",  Cod="P002", Tel="0416-7654321" },
-                        new { Login="prof_torres",    Pass="123456", Cedula="V-14523678", Nombres="Luis",      Apellidos="Torres",   Correo="l.torres@uptm.edu.ve",    Depto="Sistemas",     Cod="P003", Tel="0424-5236781" },
-                        new { Login="prof_ramirez",   Pass="123456", Cedula="V-20134576", Nombres="Ana",       Apellidos="Ramírez",  Correo="a.ramirez@uptm.edu.ve",   Depto="Ingeniería",   Cod="P004", Tel="0426-3415762" },
-                    };
-                    foreach (var p in profData)
-                    {
-                        if (!await _context.Usuarios.AnyAsync(u => u.NombreUsuario == p.Login))
-                            _context.Usuarios.Add(new Usuario { NombreUsuario=p.Login, ContrasenaHash=p.Pass, RolId=rolProf.IdRol, EstadoCuenta=true, UltimoAcceso=DateTime.UtcNow });
-                        if (!await _context.Profesores.AnyAsync(x => x.Cedula == p.Cedula))
-                            _context.Profesores.Add(new Profesor { Cedula=p.Cedula, Nombres=p.Nombres, Apellidos=p.Apellidos, CorreoInstitucional=p.Correo, Departamento=p.Depto, CodProfesor=p.Cod, Telefono=p.Tel, UsuarioLogin=p.Login });
-                    }
-                    await _context.SaveChangesAsync();
-                    log.Add($"Profesores: {profData.Length} asegurados.");
+                var profData = new[] {
+                    ("prof_garcia",  "V-12345678", "Carlos",    "García",    "c.garcia@uptm.edu.ve",  "Informática",   "P001", "0412-1234567"),
+                    ("prof_mendoza", "V-18765432", "María",     "Mendoza",   "m.mendoza@uptm.edu.ve", "Matemáticas",   "P002", "0416-7654321"),
+                    ("prof_torres",  "V-14523678", "Luis",      "Torres",    "l.torres@uptm.edu.ve",  "Sistemas",      "P003", "0424-5236781"),
+                    ("prof_ramirez", "V-20134576", "Ana",       "Ramírez",   "a.ramirez@uptm.edu.ve", "Ingeniería",    "P004", "0426-3415762"),
+                };
+                foreach (var (lg, ced, nom, ape, cor, dep, cod, tel) in profData) {
+                    if (!await _context.Usuarios.AnyAsync(u => u.NombreUsuario == lg))
+                        _context.Usuarios.Add(new Usuario { NombreUsuario=lg, ContrasenaHash="123456", RolId=rolProf.IdRol, EstadoCuenta=true, UltimoAcceso=DateTime.UtcNow });
+                    if (!await _context.Profesores.AnyAsync(x => x.Cedula == ced))
+                        _context.Profesores.Add(new Profesor { Cedula=ced, Nombres=nom, Apellidos=ape, CorreoInstitucional=cor, Departamento=dep, CodProfesor=cod, Telefono=tel, UsuarioLogin=lg });
+                }
+                await _context.SaveChangesAsync();
+                log.Add($"Profesores: {profData.Length} asegurados.");
 
-                    var dbProfs = await _context.Profesores.ToListAsync();
-                    var p1 = dbProfs.First(p => p.UsuarioLogin == "prof_garcia");
-                    var p2 = dbProfs.First(p => p.UsuarioLogin == "prof_mendoza");
-                    var p3 = dbProfs.First(p => p.UsuarioLogin == "prof_torres");
-                    var p4 = dbProfs.First(p => p.UsuarioLogin == "prof_ramirez");
-
-                    // ── 3. ESTUDIANTES ────────────────────────────────────────────────────
-                    var estData = new[]
-                    {
-                        new { Login="est_rodriguez", Pass="123456", Cedula="V-27112233", Nombres="Daniela",   Apellidos="Rodríguez", Correo="d.rodriguez@uptm.edu.ve", Carrera="Informática",        CodAlumno="20230001", Dir="Av. Principal, Mérida",     Tel="0412-9988776" },
-                        new { Login="est_lopez",      Pass="123456", Cedula="V-28990011", Nombres="Andrés",    Apellidos="López",     Correo="a.lopez@uptm.edu.ve",     Carrera="Informática",        CodAlumno="20230002", Dir="Urb. La Floresta, Mérida",Tel="0416-1122334" },
-                        new { Login="est_fernandez",  Pass="123456", Cedula="V-29445566", Nombres="Valentina", Apellidos="Fernández", Correo="v.fernandez@uptm.edu.ve",  Carrera="Administración",     CodAlumno="20230003", Dir="Sector Bella Vista, Mérida",Tel="0424-5566778" },
-                        new { Login="est_perez",      Pass="123456", Cedula="V-26778899", Nombres="Miguel",    Apellidos="Pérez",     Correo="m.perez@uptm.edu.ve",     Carrera="Administración",     CodAlumno="20230004", Dir="Res. Los Pinos, Mérida",  Tel="0426-7788990" },
-                        new { Login="est_morales",    Pass="123456", Cedula="V-30123456", Nombres="Gabriela",  Apellidos="Morales",   Correo="g.morales@uptm.edu.ve",   Carrera="Contaduría",         CodAlumno="20230005", Dir="Calle 3, El Vigía",       Tel="0412-3344556" },
-                        new { Login="est_vargas",     Pass="123456", Cedula="V-25667788", Nombres="José",      Apellidos="Vargas",    Correo="j.vargas@uptm.edu.ve",    Carrera="Informática",        CodAlumno="20220010", Dir="Edif. Las Palmas, Mérida",Tel="0416-6677889" },
-                        new { Login="est_castillo",   Pass="123456", Cedula="V-31002233", Nombres="Laura",     Apellidos="Castillo",  Correo="l.castillo@uptm.edu.ve",  Carrera="Turismo",            CodAlumno="20230006", Dir="Av. Bolívar, Mérida",     Tel="0424-0011223" },
-                        new { Login="est_jimenez",    Pass="123456", Cedula="V-24556677", Nombres="Carlos",    Apellidos="Jiménez",   Correo="c.jimenez@uptm.edu.ve",   Carrera="Contaduría",         CodAlumno="20210015", Dir="Urb. Milla, Mérida",      Tel="0426-5566770" },
-                    };
-                    foreach (var e in estData)
-                    {
-                        if (!await _context.Usuarios.AnyAsync(u => u.NombreUsuario == e.Login))
-                            _context.Usuarios.Add(new Usuario { NombreUsuario=e.Login, ContrasenaHash=e.Pass, RolId=rolEst.IdRol, EstadoCuenta=true, UltimoAcceso=DateTime.UtcNow });
-                        if (!await _context.Estudiantes.AnyAsync(x => x.Cedula == e.Cedula))
-                            _context.Estudiantes.Add(new Estudiante { Cedula=e.Cedula, Nombres=e.Nombres, Apellidos=e.Apellidos, CorreoInstitucional=e.Correo, Carrera=e.Carrera, CodAlumno=e.CodAlumno, Direccion=e.Dir, Telefono=e.Tel, FechaRegistro=DateTime.UtcNow, UsuarioLogin=e.Login });
-                    }
-                    await _context.SaveChangesAsync();
-                    log.Add($"Estudiantes: {estData.Length} asegurados.");
-
-                    var dbEsts = await _context.Estudiantes.ToListAsync();
-                    var e1 = dbEsts.First(e => e.UsuarioLogin == "est_rodriguez");
-                    var e2 = dbEsts.First(e => e.UsuarioLogin == "est_lopez");
-                    var e3 = dbEsts.First(e => e.UsuarioLogin == "est_fernandez");
-                    var e4 = dbEsts.First(e => e.UsuarioLogin == "est_perez");
-                    var e5 = dbEsts.First(e => e.UsuarioLogin == "est_morales");
-                    var e6 = dbEsts.First(e => e.UsuarioLogin == "est_vargas");
-
-                    // ── 4. ASIGNATURAS ────────────────────────────────────────────────────
-                    async Task<Asignatura> EnsureAsig(string cod, string nom, int cred, int sem, string depto, int profId)
-                    {
-                        var a = await _context.Asignaturas.FirstOrDefaultAsync(x => x.Codigo == cod);
-                        if (a == null) { a = new Asignatura { Codigo=cod, Nombre=nom, Creditos=cred, Semestre=sem, Departamento=depto, ProfesorId=profId }; _context.Asignaturas.Add(a); }
-                        return a;
-                    }
-                    var a1  = await EnsureAsig("INF101", "Introducción a la Informática",   3, 1, "Informática",   p1.IdProfesor);
-                    var a2  = await EnsureAsig("PRG101", "Algoritmos y Programación I",       4, 1, "Informática",   p1.IdProfesor);
-                    var a3  = await EnsureAsig("PRG201", "Programación Orientada a Objetos",  4, 2, "Informática",   p3.IdProfesor);
-                    var a4  = await EnsureAsig("BD201",  "Base de Datos I",                   3, 3, "Informática",   p3.IdProfesor);
-                    var a5  = await EnsureAsig("MAT101", "Cálculo I",                         4, 1, "Matemáticas",   p2.IdProfesor);
-                    var a6  = await EnsureAsig("MAT201", "Cálculo II",                        4, 2, "Matemáticas",   p2.IdProfesor);
-                    var a7  = await EnsureAsig("ADM101", "Principios de Administración",      3, 1, "Administración",p4.IdProfesor);
-                    var a8  = await EnsureAsig("ADM201", "Contabilidad General",              3, 2, "Administración",p4.IdProfesor);
-                    var a9  = await EnsureAsig("ING101", "Inglés Técnico I",                  2, 1, "Idiomas",       p2.IdProfesor);
-                    var a10 = await EnsureAsig("SIS301", "Redes y Comunicaciones",            3, 4, "Sistemas",      p3.IdProfesor);
-                    await _context.SaveChangesAsync();
-                    log.Add("Asignaturas: 10 aseguradas.");
-
-                    // ── 5. HORARIOS ───────────────────────────────────────────────────────
-                    if (!await _context.Horarios.AnyAsync())
-                    {
-                        _context.Horarios.AddRange(
-                            new Horario { AsignaturaId=a1.IdAsignatura,  Dia="Lunes",    HoraInicio="07:00", HoraFin="09:00", Aula="Aula 01" },
-                            new Horario { AsignaturaId=a1.IdAsignatura,  Dia="Miércoles",HoraInicio="07:00", HoraFin="09:00", Aula="Aula 01" },
-                            new Horario { AsignaturaId=a2.IdAsignatura,  Dia="Lunes",    HoraInicio="09:00", HoraFin="11:00", Aula="Lab Computación" },
-                            new Horario { AsignaturaId=a2.IdAsignatura,  Dia="Viernes",  HoraInicio="09:00", HoraFin="11:00", Aula="Lab Computación" },
-                            new Horario { AsignaturaId=a3.IdAsignatura,  Dia="Martes",   HoraInicio="11:00", HoraFin="13:00", Aula="Lab Computación" },
-                            new Horario { AsignaturaId=a5.IdAsignatura,  Dia="Martes",   HoraInicio="07:00", HoraFin="09:00", Aula="Aula 05" },
-                            new Horario { AsignaturaId=a5.IdAsignatura,  Dia="Jueves",   HoraInicio="07:00", HoraFin="09:00", Aula="Aula 05" },
-                            new Horario { AsignaturaId=a7.IdAsignatura,  Dia="Miércoles",HoraInicio="13:00", HoraFin="15:00", Aula="Aula 08" },
-                            new Horario { AsignaturaId=a9.IdAsignatura,  Dia="Jueves",   HoraInicio="15:00", HoraFin="17:00", Aula="Aula 02" },
-                            new Horario { AsignaturaId=a10.IdAsignatura, Dia="Viernes",  HoraInicio="11:00", HoraFin="13:00", Aula="Lab Redes" }
-                        );
-                        await _context.SaveChangesAsync();
-                        log.Add("Horarios: 10 creados.");
-                    }
-
-                    // ── 6. INSCRIPCIONES ──────────────────────────────────────────────────
-                    async Task EnsureInsc(int estId, int asigId)
-                    {
-                        if (!await _context.Inscripciones.AnyAsync(i => i.EstudianteId == estId && i.AsignaturaId == asigId))
-                            _context.Inscripciones.Add(new Inscripcion { EstudianteId=estId, AsignaturaId=asigId, Periodo="2025-I", FechaInscripcion=DateTime.UtcNow, Estado="Activo" });
-                    }
-                    // Estudiantes de Informática
-                    await EnsureInsc(e1.IdEstudiante, a1.IdAsignatura);
-                    await EnsureInsc(e1.IdEstudiante, a2.IdAsignatura);
-                    await EnsureInsc(e1.IdEstudiante, a5.IdAsignatura);
-                    await EnsureInsc(e1.IdEstudiante, a9.IdAsignatura);
-                    await EnsureInsc(e2.IdEstudiante, a1.IdAsignatura);
-                    await EnsureInsc(e2.IdEstudiante, a2.IdAsignatura);
-                    await EnsureInsc(e2.IdEstudiante, a3.IdAsignatura);
-                    await EnsureInsc(e6.IdEstudiante, a3.IdAsignatura);
-                    await EnsureInsc(e6.IdEstudiante, a4.IdAsignatura);
-                    await EnsureInsc(e6.IdEstudiante, a10.IdAsignatura);
-                    // Estudiantes de Administración
-                    await EnsureInsc(e3.IdEstudiante, a7.IdAsignatura);
-                    await EnsureInsc(e3.IdEstudiante, a8.IdAsignatura);
-                    await EnsureInsc(e3.IdEstudiante, a5.IdAsignatura);
-                    await EnsureInsc(e4.IdEstudiante, a7.IdAsignatura);
-                    await EnsureInsc(e4.IdEstudiante, a9.IdAsignatura);
-                    // Contaduría
-                    await EnsureInsc(e5.IdEstudiante, a8.IdAsignatura);
-                    await EnsureInsc(e5.IdEstudiante, a5.IdAsignatura);
-                    await _context.SaveChangesAsync();
-                    log.Add("Inscripciones: 17 aseguradas.");
-
-                    // ── 7. NOTAS ──────────────────────────────────────────────────────────
-                    if (!await _context.Notas.AnyAsync())
-                    {
-                        _context.Notas.AddRange(
-                            new Nota { EstudianteId=e1.IdEstudiante, AsignaturaId=a1.IdAsignatura,  ProfesorId=p1.IdProfesor, Calificacion=18, Fecha=DateTime.UtcNow.AddDays(-20), CodigoQR="QR-INF101-001" },
-                            new Nota { EstudianteId=e1.IdEstudiante, AsignaturaId=a2.IdAsignatura,  ProfesorId=p1.IdProfesor, Calificacion=16, Fecha=DateTime.UtcNow.AddDays(-15), CodigoQR="QR-PRG101-001" },
-                            new Nota { EstudianteId=e1.IdEstudiante, AsignaturaId=a5.IdAsignatura,  ProfesorId=p2.IdProfesor, Calificacion=14, Fecha=DateTime.UtcNow.AddDays(-10), CodigoQR="QR-MAT101-001" },
-                            new Nota { EstudianteId=e2.IdEstudiante, AsignaturaId=a1.IdAsignatura,  ProfesorId=p1.IdProfesor, Calificacion=20, Fecha=DateTime.UtcNow.AddDays(-20), CodigoQR="QR-INF101-002" },
-                            new Nota { EstudianteId=e2.IdEstudiante, AsignaturaId=a2.IdAsignatura,  ProfesorId=p1.IdProfesor, Calificacion=15, Fecha=DateTime.UtcNow.AddDays(-15), CodigoQR="QR-PRG101-002" },
-                            new Nota { EstudianteId=e2.IdEstudiante, AsignaturaId=a3.IdAsignatura,  ProfesorId=p3.IdProfesor, Calificacion=17, Fecha=DateTime.UtcNow.AddDays(-8),  CodigoQR="QR-PRG201-001" },
-                            new Nota { EstudianteId=e3.IdEstudiante, AsignaturaId=a7.IdAsignatura,  ProfesorId=p4.IdProfesor, Calificacion=19, Fecha=DateTime.UtcNow.AddDays(-12), CodigoQR="QR-ADM101-001" },
-                            new Nota { EstudianteId=e3.IdEstudiante, AsignaturaId=a5.IdAsignatura,  ProfesorId=p2.IdProfesor, Calificacion=12, Fecha=DateTime.UtcNow.AddDays(-6),  CodigoQR="QR-MAT101-003" },
-                            new Nota { EstudianteId=e4.IdEstudiante, AsignaturaId=a7.IdAsignatura,  ProfesorId=p4.IdProfesor, Calificacion=13, Fecha=DateTime.UtcNow.AddDays(-12), CodigoQR="QR-ADM101-002" },
-                            new Nota { EstudianteId=e5.IdEstudiante, AsignaturaId=a8.IdAsignatura,  ProfesorId=p4.IdProfesor, Calificacion=11, Fecha=DateTime.UtcNow.AddDays(-5),  CodigoQR="QR-ADM201-001" },
-                            new Nota { EstudianteId=e6.IdEstudiante, AsignaturaId=a3.IdAsignatura,  ProfesorId=p3.IdProfesor, Calificacion=18, Fecha=DateTime.UtcNow.AddDays(-8),  CodigoQR="QR-PRG201-002" },
-                            new Nota { EstudianteId=e6.IdEstudiante, AsignaturaId=a4.IdAsignatura,  ProfesorId=p3.IdProfesor, Calificacion=16, Fecha=DateTime.UtcNow.AddDays(-3),  CodigoQR="QR-BD201-001" }
-                        );
-                        await _context.SaveChangesAsync();
-                        log.Add("Notas: 12 creadas.");
-                    }
-
-                    // ── 8. ANUNCIOS ───────────────────────────────────────────────────────
-                    if (!await _context.Anuncios.AnyAsync())
-                    {
-                        _context.Anuncios.AddRange(
-                            new Anuncio { Titulo="Bienvenida al Período Académico 2025-I", Contenido="La Universidad Politécnica Territorial de Mérida da la bienvenida a toda la comunidad universitaria al inicio del período académico 2025-I. Les deseamos éxito en sus actividades académicas.", FechaPublicacion=DateTime.UtcNow.AddDays(-30), Autor="Rectorado" },
-                            new Anuncio { Titulo="Inicio de Inscripciones — Período 2025-II", Contenido="Se informa que el proceso de inscripciones para el período 2025-II estará disponible del 15 al 30 de junio. Revisa los requisitos en la coordinación académica.", FechaPublicacion=DateTime.UtcNow.AddDays(-10), Autor="Coordinación Académica" },
-                            new Anuncio { Titulo="Mantenimiento Programado del Sistema", Contenido="El sistema UPTMDigital estará en mantenimiento el día sábado 15/03 de 8:00am a 12:00pm. Durante ese tiempo no estará disponible.", FechaPublicacion=DateTime.UtcNow.AddDays(-5), Autor="Soporte Técnico" },
-                            new Anuncio { Titulo="Convocatoria — Feria de Proyectos Tecnológicos", Contenido="Se invita a todos los estudiantes y profesores a participar en la IV Feria de Proyectos Tecnológicos a realizarse el 25 de abril en el patio principal de la institución.", FechaPublicacion=DateTime.UtcNow.AddDays(-2), Autor="Coordinación de Investigación" },
-                            new Anuncio { Titulo="Actualización de Notas — Primer Corte", Contenido="Los profesores deberán registrar las calificaciones del primer corte antes del 20 del presente mes. Se recuerda que las notas deben ser ingresadas directamente en la plataforma.", FechaPublicacion=DateTime.UtcNow.AddDays(-1), Autor="Coordinación Docente" }
-                        );
-                        await _context.SaveChangesAsync();
-                        log.Add("Anuncios: 5 creados.");
-                    }
-
-                    // ── 9. ASISTENCIAS ────────────────────────────────────────────────────
-                    if (!await _context.Asistencias.AnyAsync())
-                    {
-                        _context.Asistencias.AddRange(
-                            new Asistencia { EstudianteId=e1.IdEstudiante, AsignaturaId=a1.IdAsignatura, Fecha=DateTime.UtcNow.AddDays(-14), Estado="Presente" },
-                            new Asistencia { EstudianteId=e1.IdEstudiante, AsignaturaId=a1.IdAsignatura, Fecha=DateTime.UtcNow.AddDays(-7),  Estado="Presente" },
-                            new Asistencia { EstudianteId=e1.IdEstudiante, AsignaturaId=a2.IdAsignatura, Fecha=DateTime.UtcNow.AddDays(-14), Estado="Presente" },
-                            new Asistencia { EstudianteId=e1.IdEstudiante, AsignaturaId=a2.IdAsignatura, Fecha=DateTime.UtcNow.AddDays(-7),  Estado="Ausente" },
-                            new Asistencia { EstudianteId=e2.IdEstudiante, AsignaturaId=a1.IdAsignatura, Fecha=DateTime.UtcNow.AddDays(-14), Estado="Presente" },
-                            new Asistencia { EstudianteId=e2.IdEstudiante, AsignaturaId=a2.IdAsignatura, Fecha=DateTime.UtcNow.AddDays(-7),  Estado="Presente" },
-                            new Asistencia { EstudianteId=e2.IdEstudiante, AsignaturaId=a3.IdAsignatura, Fecha=DateTime.UtcNow.AddDays(-3),  Estado="Justificado" },
-                            new Asistencia { EstudianteId=e3.IdEstudiante, AsignaturaId=a7.IdAsignatura, Fecha=DateTime.UtcNow.AddDays(-14), Estado="Presente" },
-                            new Asistencia { EstudianteId=e3.IdEstudiante, AsignaturaId=a7.IdAsignatura, Fecha=DateTime.UtcNow.AddDays(-7),  Estado="Ausente" },
-                            new Asistencia { EstudianteId=e4.IdEstudiante, AsignaturaId=a7.IdAsignatura, Fecha=DateTime.UtcNow.AddDays(-7),  Estado="Presente" },
-                            new Asistencia { EstudianteId=e5.IdEstudiante, AsignaturaId=a8.IdAsignatura, Fecha=DateTime.UtcNow.AddDays(-14), Estado="Presente" },
-                            new Asistencia { EstudianteId=e6.IdEstudiante, AsignaturaId=a3.IdAsignatura, Fecha=DateTime.UtcNow.AddDays(-3),  Estado="Presente" }
-                        );
-                        await _context.SaveChangesAsync();
-                        log.Add("Asistencias: 12 creadas.");
-                    }
-
-                    // ── 10. CONSTANCIAS ───────────────────────────────────────────────────
-                    if (!await _context.Constancias.AnyAsync())
-                    {
-                        _context.Constancias.AddRange(
-                            new Constancia { EstudianteId=e1.IdEstudiante, TipoConstancia="Estudio",         FechaSolicitud=DateTime.UtcNow.AddDays(-20), Estado="Emitida",    CodigoQR="CONST-001", ArchivoUrl="https://uptmdigital-api.onrender.com/constancias/CONST-001.pdf" },
-                            new Constancia { EstudianteId=e1.IdEstudiante, TipoConstancia="Buena Conducta",   FechaSolicitud=DateTime.UtcNow.AddDays(-10), Estado="Emitida",    CodigoQR="CONST-002", ArchivoUrl="https://uptmdigital-api.onrender.com/constancias/CONST-002.pdf" },
-                            new Constancia { EstudianteId=e2.IdEstudiante, TipoConstancia="Notas",            FechaSolicitud=DateTime.UtcNow.AddDays(-5),  Estado="En proceso", CodigoQR="CONST-003", ArchivoUrl=null },
-                            new Constancia { EstudianteId=e3.IdEstudiante, TipoConstancia="Estudio",         FechaSolicitud=DateTime.UtcNow.AddDays(-3),  Estado="Pendiente",  CodigoQR="CONST-004", ArchivoUrl=null }
-                        );
-                        await _context.SaveChangesAsync();
-                        log.Add("Constancias: 4 creadas.");
-                    }
-
-                    // ── 11. CONTROL DE ACCESO ─────────────────────────────────────────────
-                    if (!await _context.ControlAccesos.AnyAsync())
-                    {
-                        var accesos = new List<ControlAcceso>();
-                        var personas = new[] {
-                            (e1.Cedula, "Entrada", "Bloque A"), (e1.Cedula, "Salida",  "Bloque A"),
-                            (e2.Cedula, "Entrada", "Bloque B"), (e2.Cedula, "Salida",  "Bloque B"),
-                            (e3.Cedula, "Entrada", "Bloque A"), (e3.Cedula, "Salida",  "Bloque A"),
-                            (p1.Cedula, "Entrada", "Bloque C — Docentes"), (p1.Cedula, "Salida",  "Bloque C — Docentes"),
-                            (p2.Cedula, "Entrada", "Bloque C — Docentes"), (e4.Cedula, "Entrada", "Bloque D"),
-                        };
-                        var baseTime = DateTime.UtcNow.AddDays(-3);
-                        for (int i = 0; i < personas.Length; i++)
-                            accesos.Add(new ControlAcceso { Cedula=personas[i].Item1, Tipo=personas[i].Item2, Ubicacion=personas[i].Item3, FechaHora=baseTime.AddHours(i * 2) });
-                        _context.ControlAccesos.AddRange(accesos);
-                        await _context.SaveChangesAsync();
-                        log.Add("ControlAcceso: 10 registros creados.");
-                    }
-
-                    // ── 12. REGISTROS INSTITUCIONALES (pendientes) ────────────────────────
-                    if (!await _context.RegistrosInstitucionales.AnyAsync())
-                    {
-                        _context.RegistrosInstitucionales.AddRange(
-                            new RegistroInstitucional { Cedula="V-31500001", Nombres="Roberto",  Apellidos="Gutiérrez", CarreraDepartamento="Informática",    RolEsperado="Estudiante", CorreoInstitucional="r.gutierrez@uptm.edu.ve" },
-                            new RegistroInstitucional { Cedula="V-32100002", Nombres="Sofía",    Apellidos="Acosta",    CarreraDepartamento="Turismo",          RolEsperado="Estudiante", CorreoInstitucional="s.acosta@uptm.edu.ve" },
-                            new RegistroInstitucional { Cedula="V-19876543", Nombres="Pedro",    Apellidos="Núñez",     CarreraDepartamento="Matemáticas",     RolEsperado="Profesor",   CorreoInstitucional="p.nunez@uptm.edu.ve" },
-                            new RegistroInstitucional { Cedula="V-33001122", Nombres="Camila",   Apellidos="Blanco",    CarreraDepartamento="Administración",   RolEsperado="Estudiante", CorreoInstitucional="c.blanco@uptm.edu.ve" },
-                            new RegistroInstitucional { Cedula="V-22334455", Nombres="Francisco",Apellidos="Herrera",   CarreraDepartamento="Sistemas",         RolEsperado="Profesor",   CorreoInstitucional="f.herrera@uptm.edu.ve" }
-                        );
-                        await _context.SaveChangesAsync();
-                        log.Add("RegistrosInstitucionales: 5 creados.");
-                    }
+                var estData = new[] {
+                    ("est_rodriguez", "V-27112233", "Daniela",   "Rodríguez", "d.rodriguez@uptm.edu.ve", "Informática",    "20230001", "Av. Principal, Mérida",    "0412-9988776"),
+                    ("est_lopez",     "V-28990011", "Andrés",    "López",     "a.lopez@uptm.edu.ve",     "Informática",    "20230002", "Urb. La Floresta, Mérida", "0416-1122334"),
+                    ("est_fernandez", "V-29445566", "Valentina", "Fernández", "v.fernandez@uptm.edu.ve", "Administración", "20230003", "Bella Vista, Mérida",      "0424-5566778"),
+                    ("est_perez",     "V-26778899", "Miguel",    "Pérez",     "m.perez@uptm.edu.ve",     "Administración", "20230004", "Res. Los Pinos, Mérida",  "0426-7788990"),
+                    ("est_morales",   "V-30123456", "Gabriela",  "Morales",   "g.morales@uptm.edu.ve",   "Contaduría",     "20230005", "Calle 3, El Vigía",        "0412-3344556"),
+                    ("est_vargas",    "V-25667788", "José",      "Vargas",    "j.vargas@uptm.edu.ve",    "Informática",    "20220010", "Edif. Las Palmas, Mérida", "0416-6677889"),
+                };
+                foreach (var (lg, ced, nom, ape, cor, car, coda, dir, tel) in estData) {
+                    if (!await _context.Usuarios.AnyAsync(u => u.NombreUsuario == lg))
+                        _context.Usuarios.Add(new Usuario { NombreUsuario=lg, ContrasenaHash="123456", RolId=rolEst.IdRol, EstadoCuenta=true, UltimoAcceso=DateTime.UtcNow });
+                    if (!await _context.Estudiantes.AnyAsync(x => x.Cedula == ced))
+                        _context.Estudiantes.Add(new Estudiante { Cedula=ced, Nombres=nom, Apellidos=ape, CorreoInstitucional=cor, Carrera=car, CodAlumno=coda, Direccion=dir, Telefono=tel, FechaRegistro=DateTime.UtcNow, UsuarioLogin=lg });
+                }
+                await _context.SaveChangesAsync();
+                log.Add($"Estudiantes: {estData.Length} asegurados.");
             }
-            catch (Exception ex) when (IsTransientDbException(ex))
-            {
-                return StatusCode(StatusCodes.Status503ServiceUnavailable, new
-                {
-                    message = "Error transitorio de base de datos. Reintente en unos segundos.",
-                    detail = ex.Message
-                });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = "Error al poblar la base de datos.", detail = ex.Message });
-            }
+            catch (Exception ex) { return StatusCode(500, new { step="seed-base", error=ex.Message, log }); }
+            return Ok(new { message="Paso 1 OK. Llama seed-academico a continuación.", log });
+        }
 
-            return Ok(new
+        // ── SEED PASO 2: Asignaturas + Horarios + Inscripciones ──────────────────
+        [HttpPost("seed-academico")]
+        public async Task<IActionResult> SeedAcademico()
+        {
+            var log = new List<string>();
+            try
             {
-                message = "Base de datos poblada con data de demostración.",
-                credenciales = new[]
-                {
-                    new { usuario="prof_garcia / prof_mendoza / prof_torres / prof_ramirez", pass="123456", rol="Profesor" },
-                    new { usuario="est_rodriguez / est_lopez / est_fernandez / est_perez / est_morales / est_vargas / est_castillo / est_jimenez", pass="123456", rol="Estudiante" }
+                var p1 = await _context.Profesores.FirstOrDefaultAsync(p => p.UsuarioLogin == "prof_garcia");
+                var p2 = await _context.Profesores.FirstOrDefaultAsync(p => p.UsuarioLogin == "prof_mendoza");
+                var p3 = await _context.Profesores.FirstOrDefaultAsync(p => p.UsuarioLogin == "prof_torres");
+                var p4 = await _context.Profesores.FirstOrDefaultAsync(p => p.UsuarioLogin == "prof_ramirez");
+                if (p1==null||p2==null||p3==null||p4==null)
+                    return BadRequest(new { message="Ejecuta seed-base primero.", log });
+
+                async Task<Asignatura> GA(string cod, string nom, int cred, int sem, string dep, int pid) {
+                    var a = await _context.Asignaturas.FirstOrDefaultAsync(x => x.Codigo == cod);
+                    if (a == null) { a = new Asignatura { Codigo=cod,Nombre=nom,Creditos=cred,Semestre=sem,Departamento=dep,ProfesorId=pid }; _context.Asignaturas.Add(a); await _context.SaveChangesAsync(); }
+                    return a;
+                }
+                var a1  = await GA("INF101","Introducción a la Informática",  3,1,"Informática",   p1.IdProfesor);
+                var a2  = await GA("PRG101","Algoritmos y Programación I",     4,1,"Informática",   p1.IdProfesor);
+                var a3  = await GA("PRG201","Programación Orientada a Objetos",4,2,"Informática",   p3.IdProfesor);
+                var a4  = await GA("BD201", "Base de Datos I",                 3,3,"Informática",   p3.IdProfesor);
+                var a5  = await GA("MAT101","Cálculo I",                       4,1,"Matemáticas",   p2.IdProfesor);
+                var a7  = await GA("ADM101","Principios de Administración",    3,1,"Administración",p4.IdProfesor);
+                var a8  = await GA("ADM201","Contabilidad General",            3,2,"Administración",p4.IdProfesor);
+                var a9  = await GA("ING101","Inglés Técnico I",                2,1,"Idiomas",       p2.IdProfesor);
+                var a10 = await GA("SIS301","Redes y Comunicaciones",          3,4,"Sistemas",      p3.IdProfesor);
+                log.Add("Asignaturas: 9 aseguradas.");
+
+                if (!await _context.Horarios.AnyAsync()) {
+                    _context.Horarios.AddRange(
+                        new Horario{AsignaturaId=a1.IdAsignatura,Dia="Lunes",    HoraInicio="07:00",HoraFin="09:00",Aula="Aula 01"},
+                        new Horario{AsignaturaId=a1.IdAsignatura,Dia="Miércoles",HoraInicio="07:00",HoraFin="09:00",Aula="Aula 01"},
+                        new Horario{AsignaturaId=a2.IdAsignatura,Dia="Lunes",    HoraInicio="09:00",HoraFin="11:00",Aula="Lab Computación"},
+                        new Horario{AsignaturaId=a2.IdAsignatura,Dia="Viernes",  HoraInicio="09:00",HoraFin="11:00",Aula="Lab Computación"},
+                        new Horario{AsignaturaId=a3.IdAsignatura,Dia="Martes",   HoraInicio="11:00",HoraFin="13:00",Aula="Lab Computación"},
+                        new Horario{AsignaturaId=a5.IdAsignatura,Dia="Martes",   HoraInicio="07:00",HoraFin="09:00",Aula="Aula 05"},
+                        new Horario{AsignaturaId=a5.IdAsignatura,Dia="Jueves",   HoraInicio="07:00",HoraFin="09:00",Aula="Aula 05"},
+                        new Horario{AsignaturaId=a7.IdAsignatura,Dia="Miércoles",HoraInicio="13:00",HoraFin="15:00",Aula="Aula 08"},
+                        new Horario{AsignaturaId=a9.IdAsignatura,Dia="Jueves",   HoraInicio="15:00",HoraFin="17:00",Aula="Aula 02"},
+                        new Horario{AsignaturaId=a10.IdAsignatura,Dia="Viernes", HoraInicio="11:00",HoraFin="13:00",Aula="Lab Redes"}
+                    );
+                    await _context.SaveChangesAsync();
+                    log.Add("Horarios: 10 creados.");
+                }
+
+                if (!await _context.Inscripciones.AnyAsync()) {
+                    var e1 = await _context.Estudiantes.FirstAsync(e => e.UsuarioLogin=="est_rodriguez");
+                    var e2 = await _context.Estudiantes.FirstAsync(e => e.UsuarioLogin=="est_lopez");
+                    var e3 = await _context.Estudiantes.FirstAsync(e => e.UsuarioLogin=="est_fernandez");
+                    var e4 = await _context.Estudiantes.FirstAsync(e => e.UsuarioLogin=="est_perez");
+                    var e5 = await _context.Estudiantes.FirstAsync(e => e.UsuarioLogin=="est_morales");
+                    var e6 = await _context.Estudiantes.FirstAsync(e => e.UsuarioLogin=="est_vargas");
+                    _context.Inscripciones.AddRange(
+                        new Inscripcion{EstudianteId=e1.IdEstudiante,AsignaturaId=a1.IdAsignatura,Periodo="2025-I",FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
+                        new Inscripcion{EstudianteId=e1.IdEstudiante,AsignaturaId=a2.IdAsignatura,Periodo="2025-I",FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
+                        new Inscripcion{EstudianteId=e1.IdEstudiante,AsignaturaId=a5.IdAsignatura,Periodo="2025-I",FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
+                        new Inscripcion{EstudianteId=e1.IdEstudiante,AsignaturaId=a9.IdAsignatura,Periodo="2025-I",FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
+                        new Inscripcion{EstudianteId=e2.IdEstudiante,AsignaturaId=a1.IdAsignatura,Periodo="2025-I",FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
+                        new Inscripcion{EstudianteId=e2.IdEstudiante,AsignaturaId=a2.IdAsignatura,Periodo="2025-I",FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
+                        new Inscripcion{EstudianteId=e2.IdEstudiante,AsignaturaId=a3.IdAsignatura,Periodo="2025-I",FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
+                        new Inscripcion{EstudianteId=e6.IdEstudiante,AsignaturaId=a3.IdAsignatura,Periodo="2025-I",FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
+                        new Inscripcion{EstudianteId=e6.IdEstudiante,AsignaturaId=a4.IdAsignatura,Periodo="2025-I",FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
+                        new Inscripcion{EstudianteId=e6.IdEstudiante,AsignaturaId=a10.IdAsignatura,Periodo="2025-I",FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
+                        new Inscripcion{EstudianteId=e3.IdEstudiante,AsignaturaId=a7.IdAsignatura,Periodo="2025-I",FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
+                        new Inscripcion{EstudianteId=e3.IdEstudiante,AsignaturaId=a8.IdAsignatura,Periodo="2025-I",FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
+                        new Inscripcion{EstudianteId=e3.IdEstudiante,AsignaturaId=a5.IdAsignatura,Periodo="2025-I",FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
+                        new Inscripcion{EstudianteId=e4.IdEstudiante,AsignaturaId=a7.IdAsignatura,Periodo="2025-I",FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
+                        new Inscripcion{EstudianteId=e4.IdEstudiante,AsignaturaId=a9.IdAsignatura,Periodo="2025-I",FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
+                        new Inscripcion{EstudianteId=e5.IdEstudiante,AsignaturaId=a8.IdAsignatura,Periodo="2025-I",FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
+                        new Inscripcion{EstudianteId=e5.IdEstudiante,AsignaturaId=a5.IdAsignatura,Periodo="2025-I",FechaInscripcion=DateTime.UtcNow,Estado="Activo"}
+                    );
+                    await _context.SaveChangesAsync();
+                    log.Add("Inscripciones: 17 creadas.");
+                }
+            }
+            catch (Exception ex) { return StatusCode(500, new { step="seed-academico", error=ex.Message, log }); }
+            return Ok(new { message="Paso 2 OK. Llama seed-extra a continuación.", log });
+        }
+
+        // ── SEED PASO 3: Notas + Anuncios + Asistencias + Constancias + Accesos ──
+        [HttpPost("seed-extra")]
+        public async Task<IActionResult> SeedExtra()
+        {
+            var log = new List<string>();
+            try
+            {
+                var e1 = await _context.Estudiantes.FirstOrDefaultAsync(e => e.UsuarioLogin=="est_rodriguez");
+                var e2 = await _context.Estudiantes.FirstOrDefaultAsync(e => e.UsuarioLogin=="est_lopez");
+                var e3 = await _context.Estudiantes.FirstOrDefaultAsync(e => e.UsuarioLogin=="est_fernandez");
+                var e4 = await _context.Estudiantes.FirstOrDefaultAsync(e => e.UsuarioLogin=="est_perez");
+                var e5 = await _context.Estudiantes.FirstOrDefaultAsync(e => e.UsuarioLogin=="est_morales");
+                var e6 = await _context.Estudiantes.FirstOrDefaultAsync(e => e.UsuarioLogin=="est_vargas");
+                var p1 = await _context.Profesores.FirstOrDefaultAsync(p => p.UsuarioLogin=="prof_garcia");
+                var p2 = await _context.Profesores.FirstOrDefaultAsync(p => p.UsuarioLogin=="prof_mendoza");
+                var p3 = await _context.Profesores.FirstOrDefaultAsync(p => p.UsuarioLogin=="prof_torres");
+                var p4 = await _context.Profesores.FirstOrDefaultAsync(p => p.UsuarioLogin=="prof_ramirez");
+                if (e1==null||p1==null)
+                    return BadRequest(new { message="Ejecuta seed-base y seed-academico primero.", log });
+
+                var a1=await _context.Asignaturas.FirstAsync(a=>a.Codigo=="INF101");
+                var a2=await _context.Asignaturas.FirstAsync(a=>a.Codigo=="PRG101");
+                var a3=await _context.Asignaturas.FirstAsync(a=>a.Codigo=="PRG201");
+                var a4=await _context.Asignaturas.FirstAsync(a=>a.Codigo=="BD201");
+                var a5=await _context.Asignaturas.FirstAsync(a=>a.Codigo=="MAT101");
+                var a7=await _context.Asignaturas.FirstAsync(a=>a.Codigo=="ADM101");
+                var a8=await _context.Asignaturas.FirstAsync(a=>a.Codigo=="ADM201");
+
+                if (!await _context.Notas.AnyAsync()) {
+                    _context.Notas.AddRange(
+                        new Nota{EstudianteId=e1!.IdEstudiante,AsignaturaId=a1.IdAsignatura,ProfesorId=p1!.IdProfesor,Calificacion=18,Fecha=DateTime.UtcNow.AddDays(-20),CodigoQR="QR-INF101-001"},
+                        new Nota{EstudianteId=e1.IdEstudiante, AsignaturaId=a2.IdAsignatura,ProfesorId=p1.IdProfesor, Calificacion=16,Fecha=DateTime.UtcNow.AddDays(-15),CodigoQR="QR-PRG101-001"},
+                        new Nota{EstudianteId=e1.IdEstudiante, AsignaturaId=a5.IdAsignatura,ProfesorId=p2!.IdProfesor,Calificacion=14,Fecha=DateTime.UtcNow.AddDays(-10),CodigoQR="QR-MAT101-001"},
+                        new Nota{EstudianteId=e2!.IdEstudiante,AsignaturaId=a1.IdAsignatura,ProfesorId=p1.IdProfesor, Calificacion=20,Fecha=DateTime.UtcNow.AddDays(-20),CodigoQR="QR-INF101-002"},
+                        new Nota{EstudianteId=e2.IdEstudiante, AsignaturaId=a2.IdAsignatura,ProfesorId=p1.IdProfesor, Calificacion=15,Fecha=DateTime.UtcNow.AddDays(-15),CodigoQR="QR-PRG101-002"},
+                        new Nota{EstudianteId=e2.IdEstudiante, AsignaturaId=a3.IdAsignatura,ProfesorId=p3!.IdProfesor,Calificacion=17,Fecha=DateTime.UtcNow.AddDays(-8), CodigoQR="QR-PRG201-001"},
+                        new Nota{EstudianteId=e3!.IdEstudiante,AsignaturaId=a7.IdAsignatura,ProfesorId=p4!.IdProfesor,Calificacion=19,Fecha=DateTime.UtcNow.AddDays(-12),CodigoQR="QR-ADM101-001"},
+                        new Nota{EstudianteId=e4!.IdEstudiante,AsignaturaId=a7.IdAsignatura,ProfesorId=p4.IdProfesor, Calificacion=13,Fecha=DateTime.UtcNow.AddDays(-12),CodigoQR="QR-ADM101-002"},
+                        new Nota{EstudianteId=e5!.IdEstudiante,AsignaturaId=a8.IdAsignatura,ProfesorId=p4.IdProfesor, Calificacion=11,Fecha=DateTime.UtcNow.AddDays(-5), CodigoQR="QR-ADM201-001"},
+                        new Nota{EstudianteId=e6!.IdEstudiante,AsignaturaId=a3.IdAsignatura,ProfesorId=p3.IdProfesor, Calificacion=18,Fecha=DateTime.UtcNow.AddDays(-8), CodigoQR="QR-PRG201-002"}
+                    );
+                    await _context.SaveChangesAsync();
+                    log.Add("Notas: 10 creadas.");
+                }
+
+                if (!await _context.Anuncios.AnyAsync()) {
+                    _context.Anuncios.AddRange(
+                        new Anuncio{Titulo="Bienvenida al Período Académico 2025-I",Contenido="La UPTM Mérida da la bienvenida a toda la comunidad universitaria al inicio del período 2025-I.",FechaPublicacion=DateTime.UtcNow.AddDays(-30),Autor="Rectorado"},
+                        new Anuncio{Titulo="Inicio de Inscripciones — Período 2025-II",Contenido="Las inscripciones para el período 2025-II estarán disponibles del 15 al 30 de junio.",FechaPublicacion=DateTime.UtcNow.AddDays(-10),Autor="Coordinación Académica"},
+                        new Anuncio{Titulo="Mantenimiento del Sistema",Contenido="El sistema estará en mantenimiento el sábado 15/03 de 8:00am a 12:00pm.",FechaPublicacion=DateTime.UtcNow.AddDays(-5),Autor="Soporte Técnico"},
+                        new Anuncio{Titulo="Convocatoria — Feria de Proyectos Tecnológicos",Contenido="IV Feria de Proyectos Tecnológicos el 25 de abril en el patio principal.",FechaPublicacion=DateTime.UtcNow.AddDays(-2),Autor="Coordinación de Investigación"},
+                        new Anuncio{Titulo="Actualización de Notas — Primer Corte",Contenido="Los profesores deben registrar el primer corte antes del 20 del mes en la plataforma.",FechaPublicacion=DateTime.UtcNow.AddDays(-1),Autor="Coordinación Docente"}
+                    );
+                    await _context.SaveChangesAsync();
+                    log.Add("Anuncios: 5 creados.");
+                }
+
+                if (!await _context.Asistencias.AnyAsync()) {
+                    _context.Asistencias.AddRange(
+                        new Asistencia{EstudianteId=e1.IdEstudiante,AsignaturaId=a1.IdAsignatura,Fecha=DateTime.UtcNow.AddDays(-14),Estado="Presente"},
+                        new Asistencia{EstudianteId=e1.IdEstudiante,AsignaturaId=a1.IdAsignatura,Fecha=DateTime.UtcNow.AddDays(-7), Estado="Presente"},
+                        new Asistencia{EstudianteId=e1.IdEstudiante,AsignaturaId=a2.IdAsignatura,Fecha=DateTime.UtcNow.AddDays(-14),Estado="Presente"},
+                        new Asistencia{EstudianteId=e1.IdEstudiante,AsignaturaId=a2.IdAsignatura,Fecha=DateTime.UtcNow.AddDays(-7), Estado="Ausente"},
+                        new Asistencia{EstudianteId=e2.IdEstudiante,AsignaturaId=a1.IdAsignatura,Fecha=DateTime.UtcNow.AddDays(-14),Estado="Presente"},
+                        new Asistencia{EstudianteId=e2.IdEstudiante,AsignaturaId=a2.IdAsignatura,Fecha=DateTime.UtcNow.AddDays(-7), Estado="Presente"},
+                        new Asistencia{EstudianteId=e3.IdEstudiante,AsignaturaId=a7.IdAsignatura,Fecha=DateTime.UtcNow.AddDays(-14),Estado="Presente"},
+                        new Asistencia{EstudianteId=e3.IdEstudiante,AsignaturaId=a7.IdAsignatura,Fecha=DateTime.UtcNow.AddDays(-7), Estado="Ausente"},
+                        new Asistencia{EstudianteId=e4.IdEstudiante,AsignaturaId=a7.IdAsignatura,Fecha=DateTime.UtcNow.AddDays(-7), Estado="Presente"}
+                    );
+                    await _context.SaveChangesAsync();
+                    log.Add("Asistencias: 9 creadas.");
+                }
+
+                if (!await _context.Constancias.AnyAsync()) {
+                    _context.Constancias.AddRange(
+                        new Constancia{EstudianteId=e1.IdEstudiante,TipoConstancia="Estudio",       FechaSolicitud=DateTime.UtcNow.AddDays(-20),Estado="Emitida",   CodigoQR="CONST-001"},
+                        new Constancia{EstudianteId=e1.IdEstudiante,TipoConstancia="Buena Conducta",FechaSolicitud=DateTime.UtcNow.AddDays(-10),Estado="Emitida",   CodigoQR="CONST-002"},
+                        new Constancia{EstudianteId=e2.IdEstudiante,TipoConstancia="Notas",         FechaSolicitud=DateTime.UtcNow.AddDays(-5), Estado="En proceso",CodigoQR="CONST-003"},
+                        new Constancia{EstudianteId=e3.IdEstudiante,TipoConstancia="Estudio",       FechaSolicitud=DateTime.UtcNow.AddDays(-3), Estado="Pendiente", CodigoQR="CONST-004"}
+                    );
+                    await _context.SaveChangesAsync();
+                    log.Add("Constancias: 4 creadas.");
+                }
+
+                if (!await _context.ControlAccesos.AnyAsync()) {
+                    var t0=DateTime.UtcNow.AddDays(-2);
+                    var acc=new[]{(e1.Cedula,"Entrada","Bloque A"),(e1.Cedula,"Salida","Bloque A"),(e2.Cedula,"Entrada","Bloque B"),(e2.Cedula,"Salida","Bloque B"),(p1.Cedula,"Entrada","Bloque C — Docentes"),(p1.Cedula,"Salida","Bloque C — Docentes")};
+                    for(int i=0;i<acc.Length;i++) _context.ControlAccesos.Add(new ControlAcceso{Cedula=acc[i].Item1,Tipo=acc[i].Item2,Ubicacion=acc[i].Item3,FechaHora=t0.AddHours(i*2)});
+                    await _context.SaveChangesAsync();
+                    log.Add("ControlAcceso: 6 registros creados.");
+                }
+
+                if (!await _context.RegistrosInstitucionales.AnyAsync()) {
+                    _context.RegistrosInstitucionales.AddRange(
+                        new RegistroInstitucional{Cedula="V-31500001",Nombres="Roberto",Apellidos="Gutiérrez",CarreraDepartamento="Informática",  RolEsperado="Estudiante",CorreoInstitucional="r.gutierrez@uptm.edu.ve"},
+                        new RegistroInstitucional{Cedula="V-32100002",Nombres="Sofía",  Apellidos="Acosta",   CarreraDepartamento="Turismo",        RolEsperado="Estudiante",CorreoInstitucional="s.acosta@uptm.edu.ve"},
+                        new RegistroInstitucional{Cedula="V-19876543",Nombres="Pedro",  Apellidos="Núñez",    CarreraDepartamento="Matemáticas",   RolEsperado="Profesor",  CorreoInstitucional="p.nunez@uptm.edu.ve"}
+                    );
+                    await _context.SaveChangesAsync();
+                    log.Add("RegistrosInstitucionales: 3 creados.");
+                }
+            }
+            catch (Exception ex) { return StatusCode(500, new { step="seed-extra", error=ex.Message, log }); }
+            return Ok(new {
+                message="✅ Seed completo. Base de datos lista para pruebas.",
+                credenciales=new[]{
+                    new{usuarios="prof_garcia / prof_mendoza / prof_torres / prof_ramirez",pass="123456",rol="Profesor"},
+                    new{usuarios="est_rodriguez / est_lopez / est_fernandez / est_perez / est_morales / est_vargas",pass="123456",rol="Estudiante"}
                 },
                 log
             });
         }
 
+        [HttpPost("apply-changes")]
         [HttpPost("apply-changes")]
         public async Task<IActionResult> ApplyChanges()
         {
@@ -836,6 +817,164 @@ namespace UPTMDigital.API.Controllers
             }
 
             return Ok(new { Message = "Setup completed", Log = log });
+        }
+
+        // ── SEED NOTIFICACIONES ──────────────────────────────────────────────────
+        [HttpPost("seed-notificaciones")]
+        public async Task<IActionResult> SeedNotificaciones()
+        {
+            var log = new List<string>();
+            try
+            {
+                if (await _context.Notificaciones.AnyAsync())
+                    return Ok(new { message = "Las notificaciones ya existen. Omitiendo.", log });
+
+                // Usuarios del seed-base + testers
+                var usuarios = new[]
+                {
+                    "est_rodriguez", "est_lopez", "est_fernandez", "est_perez", "est_morales", "est_vargas",
+                    "prof_garcia",   "prof_mendoza", "prof_torres", "prof_ramirez",
+                    "tester_est",    "tester_prof"
+                };
+
+                var now = DateTime.UtcNow;
+                var notificaciones = new List<Notificacion>();
+
+                // Notificaciones de Sistema (para todos)
+                foreach (var u in usuarios)
+                {
+                    notificaciones.Add(new Notificacion { DestinatarioLogin = u, Titulo = "Bienvenido a UPTM Digital", Cuerpo = "Tu cuenta ha sido activada. Explora todas las funciones disponibles.", Tipo = "Sistema", Leida = true,  FechaCreacion = now.AddDays(-30) });
+                    notificaciones.Add(new Notificacion { DestinatarioLogin = u, Titulo = "Mantenimiento programado", Cuerpo = "El sistema estará en mantenimiento el sábado 15/03 de 8:00 a 12:00. Planifica con anticipación.", Tipo = "Sistema", Leida = false, FechaCreacion = now.AddDays(-5) });
+                }
+
+                // Notificaciones Académicas para Estudiantes
+                var estNots = new[]
+                {
+                    ("est_rodriguez", "Nueva nota publicada",        "Tu nota de Introducción a la Informática ha sido registrada: 18 pts.",          "Academica", 20),
+                    ("est_rodriguez", "Nueva nota publicada",        "Tu nota de Algoritmos y Programación I ha sido registrada: 16 pts.",             "Academica", 15),
+                    ("est_rodriguez", "Recordatorio de asistencia",  "Recuerda que tienes clase de Cálculo I mañana a las 07:00 en Aula 05.",        "Academica",  1),
+                    ("est_lopez",     "Nueva nota publicada",        "Tu nota de Introducción a la Informática ha sido registrada: 20 pts. ¡Perfecto!", "Academica", 20),
+                    ("est_lopez",     "Nueva nota publicada",        "Tu nota de POO ha sido registrada: 17 pts.",                                      "Academica",  8),
+                    ("est_fernandez", "Constancia lista",            "Tu constancia de estudio está lista para ser retirada en Coordinación.",         "Academica", 10),
+                    ("est_fernandez", "Nueva nota publicada",        "Tu nota de Administración ha sido registrada: 19 pts.",                           "Academica", 12),
+                    ("est_morales",   "Alerta académica",            "Tu nota de Contabilidad General está por debajo del mínimo aprobatorio (11 pts). Habla con tu profesor.", "Academica", 5),
+                    ("est_vargas",    "Nueva nota publicada",        "Tu nota de POO ha sido registrada: 18 pts.",                                      "Academica",  8),
+                    ("tester_est",    "Perfil completado",           "Tu perfil de estudiante está completo. ¡Ya puedes usar todas las funciones!",     "Academica",  2),
+                };
+
+                foreach (var (login, titulo, cuerpo, tipo, dias) in estNots)
+                    notificaciones.Add(new Notificacion { DestinatarioLogin = login, Titulo = titulo, Cuerpo = cuerpo, Tipo = tipo, Leida = false, FechaCreacion = now.AddDays(-dias) });
+
+                // Notificaciones para Profesores
+                var profNots = new[]
+                {
+                    ("prof_garcia",   "Nuevo mensaje en chat",       "Un estudiante te ha enviado una pregunta en el chat de INF101.",                 "Chat",      1),
+                    ("prof_garcia",   "Recordatorio: notas pendientes", "Faltan 3 días para la fecha límite de registro del primer corte.",              "Academica", 3),
+                    ("prof_mendoza",  "Nuevo mensaje en chat",       "Un estudiante te ha enviado un mensaje en el chat de MAT101.",                   "Chat",      2),
+                    ("prof_torres",   "Recordatorio: notas pendientes", "Tienes 2 estudiantes sin nota registrada en POO.",                              "Academica", 4),
+                    ("prof_ramirez",  "Nuevo estudiante inscrito",   "Un nuevo estudiante se inscribió en ADM101 este período.",                        "Academica", 7),
+                    ("tester_prof",   "Bienvenido, Profesor",        "Tu cuenta de profesor está activa. Empieza registrando las notas del período.",  "Sistema",   1),
+                };
+
+                foreach (var (login, titulo, cuerpo, tipo, dias) in profNots)
+                    notificaciones.Add(new Notificacion { DestinatarioLogin = login, Titulo = titulo, Cuerpo = cuerpo, Tipo = tipo, Leida = false, FechaCreacion = now.AddDays(-dias) });
+
+                _context.Notificaciones.AddRange(notificaciones);
+                await _context.SaveChangesAsync();
+                log.Add($"Notificaciones: {notificaciones.Count} creadas.");
+            }
+            catch (Exception ex) { return StatusCode(500, new { step = "seed-notificaciones", error = ex.Message, log }); }
+            return Ok(new { message = "✅ Notificaciones sembradas correctamente.", log });
+        }
+
+        // ── SEED MENSAJES V2 (conversaciones realistas) ──────────────────────────
+        [HttpPost("seed-mensajes-v2")]
+        public async Task<IActionResult> SeedMensajesV2()
+        {
+            var log = new List<string>();
+            try
+            {
+                if (await _context.Mensajes.AnyAsync())
+                    return Ok(new { message = "Los mensajes ya existen. Omitiendo.", log });
+
+                var inf101 = await _context.Asignaturas.FirstOrDefaultAsync(a => a.Codigo == "INF101");
+                var prg101 = await _context.Asignaturas.FirstOrDefaultAsync(a => a.Codigo == "PRG101");
+                var mat101 = await _context.Asignaturas.FirstOrDefaultAsync(a => a.Codigo == "MAT101");
+                var adm101 = await _context.Asignaturas.FirstOrDefaultAsync(a => a.Codigo == "ADM101");
+
+                if (inf101 == null || prg101 == null || mat101 == null || adm101 == null)
+                    return BadRequest(new { message = "Ejecuta seed-academico primero.", log });
+
+                var now = DateTime.UtcNow;
+                var mensajes = new List<Mensaje>();
+
+                // INF101 — Carlos García (prof) + Daniela & Andrés (est)
+                var inf = inf101.IdAsignatura;
+                mensajes.AddRange(new[]
+                {
+                    new Mensaje { AsignaturaId = inf, EmisorNombre = "Prof. Carlos García",    Contenido = "Bienvenidos a Introducción a la Informática. Por favor revisen el programa en el grupo.",           FechaEnvio = now.AddDays(-20) },
+                    new Mensaje { AsignaturaId = inf, EmisorNombre = "Daniela Rodríguez",      Contenido = "Profe, ¿cuándo es el primer corte?",                                                                  FechaEnvio = now.AddDays(-19) },
+                    new Mensaje { AsignaturaId = inf, EmisorNombre = "Prof. Carlos García",    Contenido = "El primer corte será el próximo viernes. Temas: historia de la informática y hardware.",              FechaEnvio = now.AddDays(-19) },
+                    new Mensaje { AsignaturaId = inf, EmisorNombre = "Andrés López",           Contenido = "¿Incluye la clase del martes pasado?",                                                                FechaEnvio = now.AddDays(-18) },
+                    new Mensaje { AsignaturaId = inf, EmisorNombre = "Prof. Carlos García",    Contenido = "Sí, hasta la clase de este miércoles inclusive.",                                                     FechaEnvio = now.AddDays(-18) },
+                    new Mensaje { AsignaturaId = inf, EmisorNombre = "Daniela Rodríguez",      Contenido = "¡Gracias profe! Nos preparamos.",                                                                     FechaEnvio = now.AddDays(-17) },
+                    new Mensaje { AsignaturaId = inf, EmisorNombre = "Prof. Carlos García",    Contenido = "Recuerden: la evaluación incluye parte práctica en el laboratorio.",                                  FechaEnvio = now.AddDays(-10) },
+                    new Mensaje { AsignaturaId = inf, EmisorNombre = "Andrés López",           Contenido = "Profe, ¿se puede usar apuntes en el examen práctico?",                                               FechaEnvio = now.AddDays(-9)  },
+                    new Mensaje { AsignaturaId = inf, EmisorNombre = "Prof. Carlos García",    Contenido = "No, es sin material. Pero es básico, no se preocupen.",                                              FechaEnvio = now.AddDays(-9)  },
+                    new Mensaje { AsignaturaId = inf, EmisorNombre = "Daniela Rodríguez",      Contenido = "Ok profe, muchas gracias por avisar 🙏",                                                             FechaEnvio = now.AddDays(-8)  },
+                });
+
+                // PRG101 — Carlos García (prof) + múltiples estudiantes
+                var prg = prg101.IdAsignatura;
+                mensajes.AddRange(new[]
+                {
+                    new Mensaje { AsignaturaId = prg, EmisorNombre = "Prof. Carlos García",    Contenido = "En la clase de hoy vamos a ver pseudocódigo y diagramas de flujo. Traigan papel cuadriculado.",      FechaEnvio = now.AddDays(-14) },
+                    new Mensaje { AsignaturaId = prg, EmisorNombre = "Andrés López",           Contenido = "Profe, ¿instalamos algo para la próxima clase?",                                                      FechaEnvio = now.AddDays(-13) },
+                    new Mensaje { AsignaturaId = prg, EmisorNombre = "Prof. Carlos García",    Contenido = "Sí. Instalen Python 3.11 y VS Code. El enlace está en el aula virtual.",                             FechaEnvio = now.AddDays(-13) },
+                    new Mensaje { AsignaturaId = prg, EmisorNombre = "Daniela Rodríguez",      Contenido = "¿La versión de Python importa? Yo tengo la 3.9.",                                                    FechaEnvio = now.AddDays(-12) },
+                    new Mensaje { AsignaturaId = prg, EmisorNombre = "Prof. Carlos García",    Contenido = "Con 3.9 está bien, no hay problema.",                                                                 FechaEnvio = now.AddDays(-12) },
+                    new Mensaje { AsignaturaId = prg, EmisorNombre = "José Vargas",            Contenido = "Profe, me salió un error al instalar VS Code en Windows 7. ¿Qué hago?",                              FechaEnvio = now.AddDays(-11) },
+                    new Mensaje { AsignaturaId = prg, EmisorNombre = "Prof. Carlos García",    Contenido = "VS Code no soporta Windows 7. Intenta con Notepad++ + Python directo en terminal por ahora.",        FechaEnvio = now.AddDays(-11) },
+                    new Mensaje { AsignaturaId = prg, EmisorNombre = "José Vargas",            Contenido = "¡Gracias profe, ya funcionó!",                                                                        FechaEnvio = now.AddDays(-10) },
+                    new Mensaje { AsignaturaId = prg, EmisorNombre = "Andrés López",           Contenido = "Profe, ¿el proyecto final es individual o en grupo?",                                                 FechaEnvio = now.AddDays(-5)  },
+                    new Mensaje { AsignaturaId = prg, EmisorNombre = "Prof. Carlos García",    Contenido = "En parejas. Les daré más detalles la próxima semana.",                                                FechaEnvio = now.AddDays(-5)  },
+                    new Mensaje { AsignaturaId = prg, EmisorNombre = "Daniela Rodríguez",      Contenido = "¿Puedo formar pareja con alguien de otra sección?",                                                   FechaEnvio = now.AddDays(-4)  },
+                    new Mensaje { AsignaturaId = prg, EmisorNombre = "Prof. Carlos García",    Contenido = "Solo con alguien de esta misma sección, por favor.",                                                  FechaEnvio = now.AddDays(-4)  },
+                });
+
+                // MAT101 — María Mendoza (prof)
+                var mat = mat101.IdAsignatura;
+                mensajes.AddRange(new[]
+                {
+                    new Mensaje { AsignaturaId = mat, EmisorNombre = "Prof. María Mendoza",    Contenido = "Los ejercicios del capítulo 3 son para entregar el jueves. No olviden mostrar el procedimiento.",   FechaEnvio = now.AddDays(-7) },
+                    new Mensaje { AsignaturaId = mat, EmisorNombre = "Daniela Rodríguez",      Contenido = "Profe, ¿los ejercicios pares o impares?",                                                            FechaEnvio = now.AddDays(-6) },
+                    new Mensaje { AsignaturaId = mat, EmisorNombre = "Prof. María Mendoza",    Contenido = "Del 1 al 20, todos.",                                                                                 FechaEnvio = now.AddDays(-6) },
+                    new Mensaje { AsignaturaId = mat, EmisorNombre = "Miguel Pérez",           Contenido = "¿Se puede entregar en digital o tiene que ser en físico?",                                           FechaEnvio = now.AddDays(-5) },
+                    new Mensaje { AsignaturaId = mat, EmisorNombre = "Prof. María Mendoza",    Contenido = "Físico, escrito a mano. Muéstrenme el procedimiento paso a paso.",                                   FechaEnvio = now.AddDays(-5) },
+                    new Mensaje { AsignaturaId = mat, EmisorNombre = "Valentina Fernández",    Contenido = "Profe, el ejercicio 15 no lo entiendo bien. ¿Puede explicarlo de nuevo?",                            FechaEnvio = now.AddDays(-2) },
+                    new Mensaje { AsignaturaId = mat, EmisorNombre = "Prof. María Mendoza",    Contenido = "Claro, mañana empezamos con ese ejercicio antes de continuar con el tema nuevo.",                    FechaEnvio = now.AddDays(-2) },
+                });
+
+                // ADM101 — Ana Ramírez (prof)
+                var adm = adm101.IdAsignatura;
+                mensajes.AddRange(new[]
+                {
+                    new Mensaje { AsignaturaId = adm, EmisorNombre = "Prof. Ana Ramírez",      Contenido = "Para el miércoles deben leer los capítulos 1 y 2 del libro de Robbins. Hay discusión en clase.",    FechaEnvio = now.AddDays(-8) },
+                    new Mensaje { AsignaturaId = adm, EmisorNombre = "Valentina Fernández",    Contenido = "¿Cuál edición del libro, profe?",                                                                    FechaEnvio = now.AddDays(-7) },
+                    new Mensaje { AsignaturaId = adm, EmisorNombre = "Prof. Ana Ramírez",      Contenido = "Cualquier edición del 2011 en adelante sirve. Los conceptos son los mismos.",                       FechaEnvio = now.AddDays(-7) },
+                    new Mensaje { AsignaturaId = adm, EmisorNombre = "Miguel Pérez",           Contenido = "Profe, ¿tiene el PDF del libro?",                                                                    FechaEnvio = now.AddDays(-6) },
+                    new Mensaje { AsignaturaId = adm, EmisorNombre = "Prof. Ana Ramírez",      Contenido = "Lo subiré al grupo de WhatsApp esta tarde.",                                                         FechaEnvio = now.AddDays(-6) },
+                    new Mensaje { AsignaturaId = adm, EmisorNombre = "Valentina Fernández",    Contenido = "¡Gracias profe! 🙏",                                                                                FechaEnvio = now.AddDays(-6) },
+                    new Mensaje { AsignaturaId = adm, EmisorNombre = "Miguel Pérez",           Contenido = "¿La discusión es en grupos o individual?",                                                           FechaEnvio = now.AddDays(-1) },
+                    new Mensaje { AsignaturaId = adm, EmisorNombre = "Prof. Ana Ramírez",      Contenido = "Grupal. Formaremos grupos de 3 en clase.",                                                           FechaEnvio = now.AddDays(-1) },
+                });
+
+                _context.Mensajes.AddRange(mensajes);
+                await _context.SaveChangesAsync();
+                log.Add($"Mensajes: {mensajes.Count} creados en 4 asignaturas.");
+            }
+            catch (Exception ex) { return StatusCode(500, new { step = "seed-mensajes-v2", error = ex.Message, log }); }
+            return Ok(new { message = "✅ Mensajes realistas sembrados correctamente.", log });
         }
     }
 }

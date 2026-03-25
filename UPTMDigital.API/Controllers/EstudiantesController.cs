@@ -54,6 +54,152 @@ namespace UPTMDigital.API.Controllers
             return estudiante;
         }
 
+        /// <summary>
+        /// Notas del estudiante autenticado, enriquecidas con nombre de asignatura.
+        /// El frontend puede mostrar directamente: "Algoritmos y Programación I — 18 pts".
+        /// </summary>
+        [HttpGet("me/notas")]
+        public async Task<IActionResult> GetMisNotas()
+        {
+            var username = User.FindFirst(ClaimTypes.Name)?.Value;
+            if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+            var estudiante = await _context.Estudiantes
+                .AsNoTracking()
+                .FirstOrDefaultAsync(e => e.UsuarioLogin == username);
+
+            if (estudiante == null) return NotFound("Perfil de estudiante no vinculado.");
+
+            var notas = await _context.Notas
+                .AsNoTracking()
+                .Include(n => n.Asignatura)
+                .Where(n => n.EstudianteId == estudiante.IdEstudiante)
+                .OrderByDescending(n => n.Fecha)
+                .Select(n => new
+                {
+                    n.IdNota,
+                    n.Calificacion,
+                    n.Fecha,
+                    n.CodigoQR,
+                    asignatura = n.Asignatura != null ? n.Asignatura.Nombre : "N/A",
+                    codigoAsignatura = n.Asignatura != null ? n.Asignatura.Codigo : "N/A"
+                })
+                .ToListAsync();
+
+            return Ok(notas);
+        }
+
+        /// <summary>
+        /// Asistencias del estudiante autenticado con nombre de asignatura.
+        /// </summary>
+        [HttpGet("me/asistencias")]
+        public async Task<IActionResult> GetMisAsistencias()
+        {
+            var username = User.FindFirst(ClaimTypes.Name)?.Value;
+            if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+            var estudiante = await _context.Estudiantes
+                .AsNoTracking()
+                .FirstOrDefaultAsync(e => e.UsuarioLogin == username);
+
+            if (estudiante == null) return NotFound();
+
+            var asistencias = await _context.Asistencias
+                .AsNoTracking()
+                .Include(a => a.Asignatura)
+                .Where(a => a.EstudianteId == estudiante.IdEstudiante)
+                .OrderByDescending(a => a.Fecha)
+                .Select(a => new
+                {
+                    a.IdAsistencia,
+                    a.Fecha,
+                    a.Estado,
+                    asignatura = a.Asignatura != null ? a.Asignatura.Nombre : "N/A"
+                })
+                .ToListAsync();
+
+            return Ok(asistencias);
+        }
+
+        /// <summary>
+        /// Horario del estudiante: todas las asignaturas inscritas con sus bloques horarios.
+        /// Perfeecto para la pantalla "Mi Horario".
+        /// </summary>
+        [HttpGet("me/horario")]
+        public async Task<IActionResult> GetMiHorario()
+        {
+            var username = User.FindFirst(ClaimTypes.Name)?.Value;
+            if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+            var estudiante = await _context.Estudiantes
+                .AsNoTracking()
+                .FirstOrDefaultAsync(e => e.UsuarioLogin == username);
+
+            if (estudiante == null) return NotFound();
+
+            // IDs de asignaturas en las que está inscrito
+            var asignaturaIds = await _context.Inscripciones
+                .AsNoTracking()
+                .Where(i => i.EstudianteId == estudiante.IdEstudiante)
+                .Select(i => i.AsignaturaId)
+                .ToListAsync();
+
+            var horarios = await _context.Horarios
+                .AsNoTracking()
+                .Include(h => h.Asignatura)
+                .Where(h => asignaturaIds.Contains(h.AsignaturaId))
+                .OrderBy(h => h.Dia)
+                .ThenBy(h => h.HoraInicio)
+                .Select(h => new
+                {
+                    h.IdHorario,
+                    h.Dia,
+                    h.HoraInicio,
+                    h.HoraFin,
+                    h.Aula,
+                    asignatura = h.Asignatura != null ? h.Asignatura.Nombre : "N/A",
+                    codigo = h.Asignatura != null ? h.Asignatura.Codigo : "N/A"
+                })
+                .ToListAsync();
+
+            return Ok(horarios);
+        }
+
+        /// <summary>
+        /// Asignaturas en las que está inscrito el estudiante, con detalles de la asignatura.
+        /// </summary>
+        [HttpGet("me/inscripciones")]
+        public async Task<IActionResult> GetMisInscripciones()
+        {
+            var username = User.FindFirst(ClaimTypes.Name)?.Value;
+            if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+            var estudiante = await _context.Estudiantes
+                .AsNoTracking()
+                .FirstOrDefaultAsync(e => e.UsuarioLogin == username);
+
+            if (estudiante == null) return NotFound();
+
+            var inscripciones = await _context.Inscripciones
+                .AsNoTracking()
+                .Include(i => i.Asignatura)
+                .Where(i => i.EstudianteId == estudiante.IdEstudiante)
+                .Select(i => new
+                {
+                    i.IdInscripcion,
+                    i.Periodo,
+                    i.Estado,
+                    i.FechaInscripcion,
+                    asignaturaId = i.AsignaturaId,
+                    asignatura = i.Asignatura != null ? i.Asignatura.Nombre : "N/A",
+                    codigo = i.Asignatura != null ? i.Asignatura.Codigo : "N/A",
+                    creditos = i.Asignatura != null ? i.Asignatura.Creditos : 0
+                })
+                .ToListAsync();
+
+            return Ok(inscripciones);
+        }
+
         private static bool IsTransientDbException(Exception ex)
         {
             if (ex is TimeoutException || ex is NpgsqlException)

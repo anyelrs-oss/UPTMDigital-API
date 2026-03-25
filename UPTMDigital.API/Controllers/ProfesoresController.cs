@@ -54,6 +54,80 @@ namespace UPTMDigital.API.Controllers
             return profesor;
         }
 
+        /// <summary>
+        /// Asignaturas que dicta el profesor autenticado.
+        /// </summary>
+        [HttpGet("me/asignaturas")]
+        public async Task<IActionResult> GetMisAsignaturas()
+        {
+            var username = User.FindFirst(ClaimTypes.Name)?.Value;
+            if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+            var profesor = await _context.Profesores
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.UsuarioLogin == username);
+
+            if (profesor == null) return NotFound();
+
+            var asignaturas = await _context.Asignaturas
+                .AsNoTracking()
+                .Where(a => a.ProfesorId == profesor.IdProfesor)
+                .Select(a => new
+                {
+                    a.IdAsignatura,
+                    a.Codigo,
+                    a.Nombre,
+                    a.Creditos,
+                    a.Semestre,
+                    a.Departamento
+                })
+                .ToListAsync();
+
+            return Ok(asignaturas);
+        }
+
+        /// <summary>
+        /// Horario de todas las asignaturas del profesor autenticado.
+        /// </summary>
+        [HttpGet("me/horario")]
+        public async Task<IActionResult> GetMiHorario()
+        {
+            var username = User.FindFirst(ClaimTypes.Name)?.Value;
+            if (string.IsNullOrEmpty(username)) return Unauthorized();
+
+            var profesor = await _context.Profesores
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.UsuarioLogin == username);
+
+            if (profesor == null) return NotFound();
+
+            var asignaturaIds = await _context.Asignaturas
+                .AsNoTracking()
+                .Where(a => a.ProfesorId == profesor.IdProfesor)
+                .Select(a => a.IdAsignatura)
+                .ToListAsync();
+
+            var horarios = await _context.Horarios
+                .AsNoTracking()
+                .Include(h => h.Asignatura)
+                .Where(h => asignaturaIds.Contains(h.AsignaturaId))
+                .OrderBy(h => h.Dia)
+                .ThenBy(h => h.HoraInicio)
+                .Select(h => new
+                {
+                    h.IdHorario,
+                    h.Dia,
+                    h.HoraInicio,
+                    h.HoraFin,
+                    h.Aula,
+                    asignatura = h.Asignatura != null ? h.Asignatura.Nombre : "N/A",
+                    codigo = h.Asignatura != null ? h.Asignatura.Codigo : "N/A"
+                })
+                .ToListAsync();
+
+            return Ok(horarios);
+        }
+
         private static bool IsTransientDbException(Exception ex)
         {
             if (ex is TimeoutException || ex is NpgsqlException)

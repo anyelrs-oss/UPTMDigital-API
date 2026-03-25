@@ -21,8 +21,8 @@ namespace UPTMDigital.API.Models
 
         public string Aula { get; set; } = string.Empty;
 
-        // Relation (optional if we want to include details)
-        // [ForeignKey("AsignaturaId")]
-        // public Asignatura? Asignatura { get; set; }
+        // Relación con Asignatura (navigation property para Include en consultas)
+        [ForeignKey("AsignaturaId")]
+        public Asignatura? Asignatura { get; set; }
     }
 }

@@ -79,7 +79,7 @@ namespace UPTMDigital.API.Controllers
             return Ok(new LoginResponseDto
             {
                 Token = token,
-                Expiracion = DateTime.UtcNow.AddHours(8),
+                Expiracion = DateTime.UtcNow.AddDays(30),
                 NombreUsuario = usuario.NombreUsuario,
                 Rol = roleName
             });
@@ -120,7 +120,7 @@ namespace UPTMDigital.API.Controllers
                 issuer: _config["Jwt:Issuer"],
                 audience: _config["Jwt:Audience"],
                 claims: claims,
-                expires: DateTime.Now.AddHours(8),
+                expires: DateTime.Now.AddDays(30),
                 signingCredentials: creds);
 
             return new JwtSecurityTokenHandler().WriteToken(token);

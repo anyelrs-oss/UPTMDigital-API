@@ -14,10 +14,22 @@ class ApiService {
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
   );
 
-  // Control de entorno: usar --dart-define=API_ENV=render para apuntar a la nube
-  static const String _envMode = String.fromEnvironment('API_ENV', defaultValue: 'local');
+  // Prioridad 1: URL explícita en build/deploy (recomendado para operación remota).
+  static const String _apiBaseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: '',
+  );
+  // Prioridad 2: selector simple de entorno.
+  static const String _envMode = String.fromEnvironment(
+    'API_ENV',
+    defaultValue: 'render',
+  );
 
   static String get baseUrl {
+    if (_apiBaseUrl.isNotEmpty) {
+      return _apiBaseUrl;
+    }
+
     switch (_envMode) {
       case 'render':
         return "https://uptmdigital-api.onrender.com";
@@ -25,8 +37,9 @@ class ApiService {
         return "http://uptmdigitalapi.somee.com";
       case 'local':
       default:
-        if (kIsWeb) return "http://localhost:5286";
-        return "http://192.168.0.102:5286";
+        if (kIsWeb) return "http://localhost:8080";
+        // 10.0.2.2 apunta al host local desde el emulador Android.
+        return "http://10.0.2.2:5286";
     }
   }
 
@@ -49,34 +62,31 @@ class ApiService {
 
   Future<Map<String, dynamic>> login(String username, String password) async {
     try {
-      final response = await _dio.post('/api/auth/login', data: {
-        'nombreUsuario': username,
-        'contrasena': password,
-      });
+      final response = await _dio.post(
+        '/api/auth/login',
+        data: {'nombreUsuario': username, 'contrasena': password},
+      );
 
       if (response.statusCode == 200) {
         final token = response.data['token'];
         final role = response.data['rol'];
         final userId = response.data['idUsuario'];
 
-        if (kIsWeb) {
-            // Web doesn't always support secure storage consistently in dev, use simple storage or just await
-            await storage.write(key: 'jwt_token', value: token);
-            await storage.write(key: 'user_role', value: role);
-            await storage.write(key: 'user_id', value: userId.toString());
-        } else {
-            await storage.write(key: 'jwt_token', value: token);
-            await storage.write(key: 'user_role', value: role);
-            await storage.write(key: 'user_id', value: userId.toString());
-        }
+        await storage.write(key: 'jwt_token', value: token);
+        await storage.write(key: 'user_role', value: role);
+        await storage.write(key: 'user_id', value: userId?.toString() ?? '');
+        await storage.write(key: 'username', value: username);
 
         return {'success': true, 'role': role, 'token': token};
       }
       return {'success': false, 'message': 'Credenciales inválidas'};
     } on DioException catch (e) {
       if (e.response != null && e.response!.data != null) {
-          final msg = e.response!.data['Message'] ?? e.response!.data['message'] ?? 'Error de autenticación';
-          return {'success': false, 'message': msg};
+        final msg =
+            e.response!.data['Message'] ??
+            e.response!.data['message'] ??
+            'Error de autenticación';
+        return {'success': false, 'message': msg};
       }
       return {'success': false, 'message': 'Falla de conexión con el servidor'};
     } catch (e) {
@@ -85,22 +95,28 @@ class ApiService {
     }
   }
 
-  Future<Map<String, dynamic>> register(String cedula, String username, String password) async {
+  Future<Map<String, dynamic>> register(
+    String cedula,
+    String username,
+    String password,
+  ) async {
     try {
-      final response = await _dio.post('/api/auth/register', data: {
-        'cedula': cedula,
-        'username': username,
-        'contrasena': password,
-      });
+      final response = await _dio.post(
+        '/api/auth/register',
+        data: {'cedula': cedula, 'username': username, 'contrasena': password},
+      );
 
       if (response.statusCode == 200) {
         return {'success': true, ...response.data};
       }
       return {'success': false, 'message': 'Error desconocido'};
     } on DioException catch (e) {
-        if (e.response != null) {
-            return {'success': false, 'message': e.response?.data['message'] ?? 'Error en el registro'};
-        }
+      if (e.response != null) {
+        return {
+          'success': false,
+          'message': e.response?.data['message'] ?? 'Error en el registro',
+        };
+      }
       return {'success': false, 'message': 'Error de conexión con el servidor'};
     }
   }
@@ -122,9 +138,15 @@ class ApiService {
       return {'success': false, 'message': 'No encontrada'};
     } on DioException catch (e) {
       if (e.response?.statusCode == 404) {
-        return {'success': false, 'message': 'Cédula no encontrada en el registro institucional.'};
+        return {
+          'success': false,
+          'message': 'Cédula no encontrada en el registro institucional.',
+        };
       }
-      return {'success': false, 'message': e.response?.data?['message'] ?? 'Error de conexión'};
+      return {
+        'success': false,
+        'message': e.response?.data?['message'] ?? 'Error de conexión',
+      };
     }
   }
 
@@ -392,7 +414,32 @@ class ApiService {
     }
   }
 
-  Future<void> logout() async => await storage.delete(key: 'jwt_token');
+  /// Borra toda la información de sesión del dispositivo.
+  /// Llamar siempre cuando el usuario hace logout explícito.
+  Future<void> logout() async {
+    await storage.delete(key: 'jwt_token');
+    await storage.delete(key: 'user_role');
+    await storage.delete(key: 'user_id');
+    await storage.delete(key: 'username');
+  }
+
+  /// Retorna true si hay un token guardado en el dispositivo.
+  /// No valida el token contra el servidor (basta para auto-login).
+  Future<bool> isLoggedIn() async {
+    final token = await storage.read(key: 'jwt_token');
+    return token != null && token.isNotEmpty;
+  }
+
+  /// Retorna el rol guardado localmente ('Estudiante', 'Profesor', etc.).
+  /// Útil para saber a qué dashboard redirigir sin llamar al servidor.
+  Future<String?> getSavedRole() async {
+    return await storage.read(key: 'user_role');
+  }
+
+  /// Retorna el username guardado localmente.
+  Future<String?> getSavedUsername() async {
+    return await storage.read(key: 'username');
+  }
 
   // --- DASHBOARD HELPERS ---
 
@@ -474,9 +521,12 @@ class ApiService {
     }
   }
 
-  Future<bool> addCarrera(String nombre) async => _addBlock("carreras", {"nombre": nombre});
-  Future<bool> addSemestre(String nombre) async => _addBlock("semestres", {"nombre": nombre});
-  Future<bool> addPeriodo(String nombre) async => _addBlock("periodos", {"nombre": nombre, "activo": true});
+  Future<bool> addCarrera(String nombre) async =>
+      _addBlock("carreras", {"nombre": nombre});
+  Future<bool> addSemestre(String nombre) async =>
+      _addBlock("semestres", {"nombre": nombre});
+  Future<bool> addPeriodo(String nombre) async =>
+      _addBlock("periodos", {"nombre": nombre, "activo": true});
 
   Future<bool> _addBlock(String endpoint, Map<String, dynamic> data) async {
     try {
@@ -527,14 +577,20 @@ class ApiService {
 
   Future<List<dynamic>> getInscripcionesByAsignatura(int asignaturaId) async {
     try {
-      final response = await _dio.get('/api/inscripciones/asignatura/$asignaturaId');
+      final response = await _dio.get(
+        '/api/inscripciones/asignatura/$asignaturaId',
+      );
       return response.statusCode == 200 ? response.data as List : [];
     } catch (e) {
-       print("Error fetching enrollments: $e");
-       return [];
+      print("Error fetching enrollments: $e");
+      return [];
     }
   }
-  Future<Map<String, dynamic>> registrarAcceso(String cedula, String tipo) async {
+
+  Future<Map<String, dynamic>> registrarAcceso(
+    String cedula,
+    String tipo,
+  ) async {
     try {
       final response = await _dio.post(
         '/api/controlacceso/registrar',
@@ -542,20 +598,24 @@ class ApiService {
       );
       if (response.statusCode == 200) {
         return {
-          "success": true, 
-          "nombre": response.data['nombre'], 
+          "success": true,
+          "nombre": response.data['nombre'],
           "rol": response.data['rol'],
-          "hora": response.data['fecha']
+          "hora": response.data['fecha'],
         };
       }
       return {"success": false, "message": "Error desconocido"};
     } on DioException catch (e) {
       if (e.response != null) {
-        return {"success": false, "message": e.response?.data?.toString() ?? "Error"};
+        return {
+          "success": false,
+          "message": e.response?.data?.toString() ?? "Error",
+        };
       }
       return {"success": false, "message": "Error de conexión"};
     }
   }
+
   Future<bool> registrarAperturaAula(String cedula, String aula) async {
     try {
       final response = await _dio.post(

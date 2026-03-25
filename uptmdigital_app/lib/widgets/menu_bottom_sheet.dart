@@ -164,8 +164,11 @@ class MenuBottomSheet extends StatelessWidget {
             'title': 'SEGURIDAD & OTROS',
             'items': [
               {'icon': Icons.qr_code_scanner, 'label': 'Escanear QR', 'onTap': () {
-                 // QR Scan doesn't technically need student data, but good to have context
-                 nav(const QrScanScreen()); // Adjust if QrScanScreen needs args
+                 if (hasData && userData!['idEstudiante'] != null) {
+                    nav(QRScanScreen(studentId: userData!['idEstudiante']));
+                 } else {
+                    notImpl(); // Or a custom message asking to login properly
+                 }
               }}, 
               {'icon': Icons.settings, 'label': 'Ajustes', 'onTap': notImpl},
             ]
@@ -232,7 +235,7 @@ class MenuBottomSheet extends StatelessWidget {
            {
              'title': 'CONFIGURACIÓN',
              'items': [
-               {'icon': Icons.settings_security, 'label': 'Configuración', 'onTap': notImpl},
+               {'icon': Icons.security, 'label': 'Configuración', 'onTap': notImpl},
                {'icon': Icons.report_problem, 'label': 'Reportes', 'onTap': notImpl},
              ]
            }
