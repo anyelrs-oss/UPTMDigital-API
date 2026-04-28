@@ -11,10 +11,21 @@ namespace UPTMDigital.API.Models
         public string Codigo { get; set; } = null!;
         public string Nombre { get; set; } = null!;
         public int Creditos { get; set; }
-        public int? Semestre { get; set; }
         public string? Departamento { get; set; }
-        public int? ProfesorId { get; set; }
 
+        // --- FK Normalizadas ---
+        public int? ProfesorId { get; set; }
+        [ForeignKey("ProfesorId")]
         public Profesor? Profesor { get; set; }
+
+        public int? SemestreId { get; set; }
+        [ForeignKey("SemestreId")]
+        public Semestre? Semestre { get; set; }
+
+        public int? CarreraId { get; set; }
+        [ForeignKey("CarreraId")]
+        public Carrera? Carrera { get; set; }
+
+        public bool Activo { get; set; } = true;
     }
 }

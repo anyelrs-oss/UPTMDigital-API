@@ -27,7 +27,7 @@ class _AsignaturaFormScreenState extends State<AsignaturaFormScreen> {
     _codigoController = TextEditingController(text: widget.asignatura?.codigo ?? '');
     _nombreController = TextEditingController(text: widget.asignatura?.nombre ?? '');
     _creditosController = TextEditingController(text: widget.asignatura?.creditos.toString() ?? '');
-    _semestreController = TextEditingController(text: widget.asignatura?.semestre.toString() ?? '');
+    _semestreController = TextEditingController(text: widget.asignatura?.semestreId?.toString() ?? '');
     _departamentoController = TextEditingController(text: widget.asignatura?.departamento ?? '');
     _loadSemestres();
   }
@@ -63,7 +63,7 @@ class _AsignaturaFormScreenState extends State<AsignaturaFormScreen> {
       'codigo': _codigoController.text,
       'nombre': _nombreController.text,
       'creditos': int.tryParse(_creditosController.text) ?? 0,
-      'semestre': int.tryParse(_semestreController.text) ?? 1,
+      'semestreId': int.tryParse(_semestreController.text),
       'departamento': _departamentoController.text,
     };
 

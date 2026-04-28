@@ -11,8 +11,8 @@ import 'package:uptmdigital_app/screens/asistencias_screen.dart';
 import 'package:uptmdigital_app/screens/constancias_screen.dart';
 import 'package:uptmdigital_app/screens/admin_maintenance_screen.dart';
 import 'package:uptmdigital_app/screens/horarios_screen.dart';
+import 'package:uptmdigital_app/screens/usuarios_screen.dart';
 import 'package:uptmdigital_app/widgets/institutional_card.dart';
-
 
 class AdminDashboard extends StatelessWidget {
   const AdminDashboard({super.key});
@@ -42,95 +42,140 @@ class AdminDashboard extends StatelessWidget {
           ),
         ],
       ),
-      body: GridView.count(
-        padding: const EdgeInsets.all(24),
-        crossAxisCount: 2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
+      body: ListView(
+        padding: const EdgeInsets.all(16),
         children: [
-          _AdminCard(
-            icon: Icons.people_outline,
-            title: "Estudiantes",
-            color: AppTheme.secondary,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const EstudiantesScreen()),
-            ),
+          // --- PERSONAS ---
+          _SectionHeader(icon: Icons.people, title: "Personas"),
+          const SizedBox(height: 8),
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 3,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 0.95,
+            children: [
+              _AdminCard(
+                icon: Icons.manage_accounts,
+                title: "Usuarios",
+                color: Colors.purple,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const UsuariosScreen())),
+              ),
+              _AdminCard(
+                icon: Icons.people_outline,
+                title: "Estudiantes",
+                color: Colors.green,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EstudiantesScreen())),
+              ),
+              _AdminCard(
+                icon: Icons.school_outlined,
+                title: "Profesores",
+                color: Colors.blue,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfesoresScreen())),
+              ),
+            ],
           ),
-          _AdminCard(
-            icon: Icons.school_outlined,
-            title: "Profesores",
-            color: AppTheme.secondary,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ProfesoresScreen()),
-            ),
+          const SizedBox(height: 20),
+
+          // --- ACADÉMICO ---
+          _SectionHeader(icon: Icons.menu_book, title: "Académico"),
+          const SizedBox(height: 8),
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 3,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 0.95,
+            children: [
+              _AdminCard(
+                icon: Icons.book_outlined,
+                title: "Asignaturas",
+                color: AppTheme.secondary,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AsignaturasScreen())),
+              ),
+              _AdminCard(
+                icon: Icons.app_registration,
+                title: "Inscripciones",
+                color: AppTheme.secondary,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InscripcionesScreen())),
+              ),
+              _AdminCard(
+                icon: Icons.grade,
+                title: "Notas",
+                color: AppTheme.secondary,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotasScreen())),
+              ),
+              _AdminCard(
+                icon: Icons.check_circle_outline,
+                title: "Asistencias",
+                color: AppTheme.secondary,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AsistenciasScreen())),
+              ),
+              _AdminCard(
+                icon: Icons.access_time,
+                title: "Horarios",
+                color: AppTheme.secondary,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HorariosScreen(isAdmin: true))),
+              ),
+            ],
           ),
-          _AdminCard(
-            icon: Icons.book_outlined,
-            title: "Asignaturas",
-            color: AppTheme.secondary,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AsignaturasScreen()),
-            ),
+          const SizedBox(height: 20),
+
+          // --- SERVICIOS ---
+          _SectionHeader(icon: Icons.miscellaneous_services, title: "Servicios"),
+          const SizedBox(height: 8),
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 3,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 0.95,
+            children: [
+              _AdminCard(
+                icon: Icons.description_outlined,
+                title: "Constancias",
+                color: Colors.teal,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ConstanciasScreen())),
+              ),
+              _AdminCard(
+                icon: Icons.settings,
+                title: "Mantenimiento",
+                color: Colors.grey,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminMaintenanceScreen())),
+              ),
+            ],
           ),
-          _AdminCard(
-            icon: Icons.app_registration,
-            title: "Inscripciones",
-            color: AppTheme.secondary,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const InscripcionesScreen()),
-            ),
-          ),
-          _AdminCard(
-            icon: Icons.grade,
-            title: "Notas",
-            color: AppTheme.secondary,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const NotasScreen()),
-            ),
-          ),
-          _AdminCard(
-            icon: Icons.check_circle_outline,
-            title: "Asistencias",
-            color: AppTheme.secondary,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AsistenciasScreen()),
-            ),
-          ),
-          _AdminCard(
-            icon: Icons.description_outlined,
-            title: "Constancias",
-            color: AppTheme.secondary,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ConstanciasScreen()),
-            ),
-          ),
-          _AdminCard(
-            icon: Icons.access_time,
-            title: "Horarios",
-            color: AppTheme.secondary,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const HorariosScreen(isAdmin: true)),
-            ),
-          ),
-          _AdminCard(
-            icon: Icons.settings,
-            title: "Mantenimiento",
-            color: Colors.grey, // Distinction for maintenance
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AdminMaintenanceScreen()),
-            ),
-          ),
+          const SizedBox(height: 40),
         ],
       ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  const _SectionHeader({required this.icon, required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: AppTheme.primary),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: AppTheme.primary,
+          ),
+        ),
+        const Expanded(child: Divider(indent: 12)),
+      ],
     );
   }
 }
@@ -151,42 +196,28 @@ class _AdminCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InstitutionalCard(
-      margin: EdgeInsets.zero, // GridView handles spacing
-      onTap: onTap, // InstitutionalCard needs to support onTap, checking if it does...
-      // Wait, standard InstitutionalCard might not have onTap. 
-      // If it doesn't, I should wrap it or use InkWell inside it.
-      // Let's assume standard usage: InstitutionalCard(child: ...)
-      // If I need tap, I should likely wrap the inner content or if the card doesn't support it, wrap the Card.
-      // Let's check InstitutionalCard definition in my memory. 
-      // It's a Container -> Decoration. It might not have InkWell.
-      // I will wrap the InstitutionalCard content in InkWell OR update InstitutionalCard to support onTap.
-      // Better: Wrap InstitutionalCard in GestureDetector/InkWell? No, shadows/radius issues.
-      // Best: Using the content of InstitutionalCard. 
-      // Actually, InstitutionalCard is a styling wrapper. 
-      // Let's wrap InstitutionalCard in an InkWell? No, the Card decoration is inside.
-      // Let's Assume I can pass a child that handles taps. 
-      
-      child: InkWell( // Ripples might be clipped or weird if not on Material
+      margin: EdgeInsets.zero,
+      child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Container(
-           width: double.infinity, // Fill the grid cell
-           padding: const EdgeInsets.symmetric(vertical: 24),
+           width: double.infinity,
+           padding: const EdgeInsets.symmetric(vertical: 16),
            child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               CircleAvatar(
-                radius: 30,
+                radius: 24,
                 backgroundColor: color.withOpacity(0.1),
-                child: Icon(icon, size: 30, color: color),
+                child: Icon(icon, size: 24, color: color),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
               Text(
                 title,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: 16,
+                  fontSize: 13,
                   color: AppTheme.textPrimary,
                 ),
               ),
@@ -197,4 +228,3 @@ class _AdminCard extends StatelessWidget {
     );
   }
 }
-

@@ -8,13 +8,21 @@ namespace UPTMDigital.API.Models
     {
         [Key]
         public int IdInscripcion { get; set; }
+
+        // --- FK Normalizadas ---
         public int EstudianteId { get; set; }
+        [ForeignKey("EstudianteId")]
+        public Estudiante Estudiante { get; set; } = null!;
+
         public int AsignaturaId { get; set; }
-        public string Periodo { get; set; } = null!;
+        [ForeignKey("AsignaturaId")]
+        public Asignatura Asignatura { get; set; } = null!;
+
+        public int? PeriodoId { get; set; }
+        [ForeignKey("PeriodoId")]
+        public Periodo? Periodo { get; set; }
+
         public DateTime? FechaInscripcion { get; set; }
         public string? Estado { get; set; }
-
-        public Estudiante Estudiante { get; set; } = null!;
-        public Asignatura Asignatura { get; set; } = null!;
     }
 }

@@ -20,26 +20,49 @@ namespace UPTMDigital.API.Controllers
             _context = context;
         }
 
-        // GET: api/estudiantes
+        // GET: api/estudiantes?search=&carrera=&activo=
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Estudiante>>> GetEstudiantes()
+        public async Task<ActionResult<IEnumerable<Estudiante>>> GetEstudiantes(
+            [FromQuery] string? search,
+            [FromQuery] string? carrera,
+            [FromQuery] bool? activo)
         {
-            return await _context.Estudiantes.ToListAsync();
+            var query = _context.Estudiantes.AsQueryable();
+
+            // Soft delete filter (default: only active)
+            if (activo.HasValue)
+                query = query.Where(e => e.Activo == activo.Value);
+            else
+                query = query.Where(e => e.Activo);
+
+            if (!string.IsNullOrEmpty(search))
+            {
+                var s = search.ToLower();
+                query = query.Where(e =>
+                    e.Nombres.ToLower().Contains(s) ||
+                    e.Apellidos.ToLower().Contains(s) ||
+                    e.Cedula.ToLower().Contains(s));
+            }
+
+            if (!string.IsNullOrEmpty(carrera))
+                query = query.Where(e => e.Carrera != null && e.Carrera.Nombre.ToLower().Contains(carrera.ToLower()));
+
+            return await query.OrderBy(e => e.Apellidos).ToListAsync();
         }
 
         // GET: api/estudiantes/me
         [HttpGet("me")]
         public async Task<ActionResult<Estudiante>> GetMe()
         {
-            var username = User.FindFirst(ClaimTypes.Name)?.Value;
-            if (string.IsNullOrEmpty(username)) return Unauthorized();
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var userId)) return Unauthorized();
 
             Estudiante? estudiante;
             try
             {
                 estudiante = await _context.Estudiantes
                     .AsNoTracking()
-                    .FirstOrDefaultAsync(e => e.UsuarioLogin == username);
+                    .FirstOrDefaultAsync(e => e.UsuarioId == userId);
             }
             catch (Exception ex) when (IsTransientDbException(ex))
             {
@@ -61,12 +84,12 @@ namespace UPTMDigital.API.Controllers
         [HttpGet("me/notas")]
         public async Task<IActionResult> GetMisNotas()
         {
-            var username = User.FindFirst(ClaimTypes.Name)?.Value;
-            if (string.IsNullOrEmpty(username)) return Unauthorized();
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var userId)) return Unauthorized();
 
             var estudiante = await _context.Estudiantes
                 .AsNoTracking()
-                .FirstOrDefaultAsync(e => e.UsuarioLogin == username);
+                .FirstOrDefaultAsync(e => e.UsuarioId == userId);
 
             if (estudiante == null) return NotFound("Perfil de estudiante no vinculado.");
 
@@ -95,12 +118,12 @@ namespace UPTMDigital.API.Controllers
         [HttpGet("me/asistencias")]
         public async Task<IActionResult> GetMisAsistencias()
         {
-            var username = User.FindFirst(ClaimTypes.Name)?.Value;
-            if (string.IsNullOrEmpty(username)) return Unauthorized();
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var userId)) return Unauthorized();
 
             var estudiante = await _context.Estudiantes
                 .AsNoTracking()
-                .FirstOrDefaultAsync(e => e.UsuarioLogin == username);
+                .FirstOrDefaultAsync(e => e.UsuarioId == userId);
 
             if (estudiante == null) return NotFound();
 
@@ -128,12 +151,12 @@ namespace UPTMDigital.API.Controllers
         [HttpGet("me/horario")]
         public async Task<IActionResult> GetMiHorario()
         {
-            var username = User.FindFirst(ClaimTypes.Name)?.Value;
-            if (string.IsNullOrEmpty(username)) return Unauthorized();
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var userId)) return Unauthorized();
 
             var estudiante = await _context.Estudiantes
                 .AsNoTracking()
-                .FirstOrDefaultAsync(e => e.UsuarioLogin == username);
+                .FirstOrDefaultAsync(e => e.UsuarioId == userId);
 
             if (estudiante == null) return NotFound();
 
@@ -171,12 +194,12 @@ namespace UPTMDigital.API.Controllers
         [HttpGet("me/inscripciones")]
         public async Task<IActionResult> GetMisInscripciones()
         {
-            var username = User.FindFirst(ClaimTypes.Name)?.Value;
-            if (string.IsNullOrEmpty(username)) return Unauthorized();
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var userId)) return Unauthorized();
 
             var estudiante = await _context.Estudiantes
                 .AsNoTracking()
-                .FirstOrDefaultAsync(e => e.UsuarioLogin == username);
+                .FirstOrDefaultAsync(e => e.UsuarioId == userId);
 
             if (estudiante == null) return NotFound();
 
@@ -254,17 +277,17 @@ namespace UPTMDigital.API.Controllers
             return NoContent();
         }
 
-        // DELETE: api/estudiantes/5
+        // DELETE: api/estudiantes/5 (soft delete)
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteEstudiante(int id)
         {
             var estudiante = await _context.Estudiantes.FindAsync(id);
             if (estudiante == null) return NotFound();
 
-            _context.Estudiantes.Remove(estudiante);
+            estudiante.Activo = false;
             await _context.SaveChangesAsync();
 
-            return NoContent();
+            return Ok(new { Message = "Estudiante desactivado." });
         }
     }
 }

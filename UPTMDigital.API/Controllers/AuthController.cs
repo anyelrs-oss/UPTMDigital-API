@@ -139,9 +139,8 @@ namespace UPTMDigital.API.Controllers
             if (record == null)
                 return NotFound(new { Message = "Cédula no encontrada en el registro institucional de la UPTM." });
 
-            // Verificar si ya tiene cuenta creada en la App
-            var yaTieneCuenta = await _context.Estudiantes.AnyAsync(e => e.Cedula == cedula)
-                             || await _context.Profesores.AnyAsync(p => p.Cedula == cedula);
+            // Verificar si ya tiene cuenta creada en la App (buscando en Usuarios)
+            var yaTieneCuenta = await _context.Usuarios.AnyAsync(u => u.Cedula == cedula);
 
             return Ok(new
             {
@@ -167,14 +166,15 @@ namespace UPTMDigital.API.Controllers
             if (institutionalRecord == null)
                 return BadRequest(new { Message = "Cédula no encontrada en el registro institucional de la UPTM." });
 
-            // 3. Check if cedula already has an account
-            var yaRegistrado = await _context.Estudiantes.AnyAsync(e => e.Cedula == register.Cedula)
-                            || await _context.Profesores.AnyAsync(p => p.Cedula == register.Cedula);
+            var yaRegistrado = await _context.Usuarios.AnyAsync(u => u.Cedula == register.Cedula);
             if (yaRegistrado)
                 return BadRequest(new { Message = "Esta cédula ya tiene una cuenta registrada." });
 
-            // 4. Determine Role ID
-            var roleName = institutionalRecord.RolEsperado == "Profesor" ? "Profesor" : "Estudiante";
+            // 4. Determine Role ID (supports Estudiante, Profesor, Seguridad)
+            var roleName = institutionalRecord.RolEsperado;
+            if (roleName != "Profesor" && roleName != "Seguridad")
+                roleName = "Estudiante"; // Default fallback
+
             var roleNode = await _context.Roles.FirstOrDefaultAsync(r => r.NombreRol == roleName);
 
             if (roleNode == null) return BadRequest(new { Message = "Rol no configurado en el sistema." });
@@ -183,7 +183,7 @@ namespace UPTMDigital.API.Controllers
             var newUser = new Usuario
             {
                 NombreUsuario = register.Username,
-                ContrasenaHash = register.Contrasena, // Plaintext for dev/staging
+                ContrasenaHash = register.Contrasena,
                 Cedula = register.Cedula,
                 RolId = roleNode.IdRol,
                 EstadoCuenta = true,
@@ -193,7 +193,7 @@ namespace UPTMDigital.API.Controllers
             _context.Usuarios.Add(newUser);
             await _context.SaveChangesAsync();
 
-            // 6. Migrate Data to Profile (Estudiante or Profesor)
+            // 6. Create Profile (Estudiante, Profesor, or none for Seguridad)
             if (roleName == "Estudiante")
             {
                 _context.Estudiantes.Add(new Estudiante
@@ -201,9 +201,8 @@ namespace UPTMDigital.API.Controllers
                     Cedula = institutionalRecord.Cedula,
                     Nombres = institutionalRecord.Nombres,
                     Apellidos = institutionalRecord.Apellidos,
-                    Carrera = institutionalRecord.CarreraDepartamento,
                     CorreoInstitucional = institutionalRecord.CorreoInstitucional,
-                    UsuarioLogin = newUser.NombreUsuario,
+                    UsuarioId = newUser.IdUsuario,
                     FechaRegistro = DateTime.Now
                 });
             }
@@ -216,9 +215,10 @@ namespace UPTMDigital.API.Controllers
                     Apellidos = institutionalRecord.Apellidos,
                     Departamento = institutionalRecord.CarreraDepartamento,
                     CorreoInstitucional = institutionalRecord.CorreoInstitucional,
-                    UsuarioLogin = newUser.NombreUsuario
+                    UsuarioId = newUser.IdUsuario
                 });
             }
+            // Seguridad: no profile needed, only Usuario with correct RolId
 
             await _context.SaveChangesAsync();
 

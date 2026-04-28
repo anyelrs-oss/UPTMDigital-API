@@ -19,18 +19,24 @@ namespace UPTMDigital.API.Controllers
             _context = context;
         }
 
+        private int? GetUserId()
+        {
+            var str = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (int.TryParse(str, out var id)) return id;
+            return null;
+        }
+
         /// <summary>
-        /// Retorna todas las notificaciones del usuario autenticado, ordenadas de más reciente a más antigua.
-        /// El frontend usa este endpoint para mostrar el "badgito" rojo y la lista de notificaciones.
+        /// Retorna todas las notificaciones del usuario autenticado.
         /// </summary>
         [HttpGet("me")]
         public async Task<ActionResult<IEnumerable<Notificacion>>> GetMisNotificaciones()
         {
-            var username = User.FindFirst(ClaimTypes.Name)?.Value;
-            if (string.IsNullOrEmpty(username)) return Unauthorized();
+            var userId = GetUserId();
+            if (userId == null) return Unauthorized();
 
             var notificaciones = await _context.Notificaciones
-                .Where(n => n.DestinatarioLogin == username)
+                .Where(n => n.UsuarioId == userId)
                 .OrderByDescending(n => n.FechaCreacion)
                 .ToListAsync();
 
@@ -38,33 +44,31 @@ namespace UPTMDigital.API.Controllers
         }
 
         /// <summary>
-        /// Retorna solo el conteo de notificaciones NO leídas.
-        /// Útil para actualizar el badge sin cargar toda la lista.
+        /// Conteo de notificaciones NO leídas.
         /// </summary>
         [HttpGet("me/no-leidas")]
         public async Task<ActionResult<int>> GetConteoNoLeidas()
         {
-            var username = User.FindFirst(ClaimTypes.Name)?.Value;
-            if (string.IsNullOrEmpty(username)) return Unauthorized();
+            var userId = GetUserId();
+            if (userId == null) return Unauthorized();
 
             var count = await _context.Notificaciones
-                .CountAsync(n => n.DestinatarioLogin == username && !n.Leida);
+                .CountAsync(n => n.UsuarioId == userId && !n.Leida);
 
             return Ok(new { total = count });
         }
 
         /// <summary>
         /// Marca una notificación específica como leída.
-        /// Se llama cuando el usuario toca una notificación en la lista.
         /// </summary>
         [HttpPost("me/{id}/leer")]
         public async Task<IActionResult> MarcarLeida(int id)
         {
-            var username = User.FindFirst(ClaimTypes.Name)?.Value;
-            if (string.IsNullOrEmpty(username)) return Unauthorized();
+            var userId = GetUserId();
+            if (userId == null) return Unauthorized();
 
             var notif = await _context.Notificaciones
-                .FirstOrDefaultAsync(n => n.IdNotificacion == id && n.DestinatarioLogin == username);
+                .FirstOrDefaultAsync(n => n.IdNotificacion == id && n.UsuarioId == userId);
 
             if (notif == null) return NotFound();
 
@@ -74,17 +78,16 @@ namespace UPTMDigital.API.Controllers
         }
 
         /// <summary>
-        /// Marca TODAS las notificaciones del usuario como leídas de una vez.
-        /// Útil para el botón "Marcar todas como leídas".
+        /// Marca TODAS las notificaciones del usuario como leídas.
         /// </summary>
         [HttpPost("me/leer-todas")]
         public async Task<IActionResult> MarcarTodasLeidas()
         {
-            var username = User.FindFirst(ClaimTypes.Name)?.Value;
-            if (string.IsNullOrEmpty(username)) return Unauthorized();
+            var userId = GetUserId();
+            if (userId == null) return Unauthorized();
 
             var pendientes = await _context.Notificaciones
-                .Where(n => n.DestinatarioLogin == username && !n.Leida)
+                .Where(n => n.UsuarioId == userId && !n.Leida)
                 .ToListAsync();
 
             pendientes.ForEach(n => n.Leida = true);
@@ -110,9 +113,9 @@ namespace UPTMDigital.API.Controllers
         [HttpDelete("me/{id}")]
         public async Task<IActionResult> DeleteNotificacion(int id)
         {
-            var username = User.FindFirst(ClaimTypes.Name)?.Value;
+            var userId = GetUserId();
             var notif = await _context.Notificaciones
-                .FirstOrDefaultAsync(n => n.IdNotificacion == id && n.DestinatarioLogin == username);
+                .FirstOrDefaultAsync(n => n.IdNotificacion == id && n.UsuarioId == userId);
 
             if (notif == null) return NotFound();
 

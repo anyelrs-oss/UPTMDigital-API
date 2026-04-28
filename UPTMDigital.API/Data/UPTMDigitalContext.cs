@@ -28,5 +28,52 @@ namespace UPTMDigital.API.Data
         public DbSet<Semestre> Semestres { get; set; } = null!;
         public DbSet<Periodo> Periodos { get; set; } = null!;
         public DbSet<Notificacion> Notificaciones { get; set; } = null!;
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+
+            // ControlAcceso tiene dos FK a Usuario (escaneado y guardia)
+            // EF necesita saber cuál es cuál para evitar cascadas múltiples
+            modelBuilder.Entity<ControlAcceso>()
+                .HasOne(c => c.Usuario)
+                .WithMany()
+                .HasForeignKey(c => c.UsuarioId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<ControlAcceso>()
+                .HasOne(c => c.PersonalSeguridad)
+                .WithMany()
+                .HasForeignKey(c => c.PersonalSeguridadId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Mensaje → Usuario (emisor)
+            modelBuilder.Entity<Mensaje>()
+                .HasOne(m => m.Usuario)
+                .WithMany()
+                .HasForeignKey(m => m.UsuarioId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Mensaje → Asignatura
+            modelBuilder.Entity<Mensaje>()
+                .HasOne(m => m.Asignatura)
+                .WithMany()
+                .HasForeignKey(m => m.AsignaturaId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Notificacion → Usuario (destinatario)
+            modelBuilder.Entity<Notificacion>()
+                .HasOne(n => n.Usuario)
+                .WithMany()
+                .HasForeignKey(n => n.UsuarioId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Anuncio → Usuario (autor)
+            modelBuilder.Entity<Anuncio>()
+                .HasOne(a => a.Usuario)
+                .WithMany()
+                .HasForeignKey(a => a.UsuarioId)
+                .OnDelete(DeleteBehavior.Restrict);
+        }
     }
 }

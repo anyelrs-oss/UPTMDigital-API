@@ -12,13 +12,24 @@ namespace UPTMDigital.API.Models
         public string Nombres { get; set; } = null!;
         public string Apellidos { get; set; } = null!;
         public string? CorreoInstitucional { get; set; }
-        public string? CodAlumno { get; set; } // Map to 'cod_alumno'
-        public string? CodCarrera { get; set; } // Map to 'cod_carrera'
-        public string? Carrera { get; set; }
-        public string? Direccion { get; set; }
+        public string? CodAlumno { get; set; }
         public string? Telefono { get; set; }
+        public string? Direccion { get; set; }
+
+        // --- FK Normalizadas ---
+        public int? UsuarioId { get; set; }
+        [ForeignKey("UsuarioId")]
+        public Usuario? Usuario { get; set; }
+
+        public int? CarreraId { get; set; }
+        [ForeignKey("CarreraId")]
+        public Carrera? Carrera { get; set; }
+
+        // Campo calculado/legacy para compatibilidad
+        [NotMapped]
+        public string CarreraNombre => Carrera?.Nombre ?? "";
 
         public DateTime? FechaRegistro { get; set; }
-        public string? UsuarioLogin { get; set; }
+        public bool Activo { get; set; } = true;
     }
 }

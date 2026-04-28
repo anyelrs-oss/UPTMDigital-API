@@ -12,9 +12,15 @@ namespace UPTMDigital.API.Models
         public string Nombres { get; set; } = null!;
         public string Apellidos { get; set; } = null!;
         public string? CorreoInstitucional { get; set; }
-        public string? CodProfesor { get; set; } // Map to 'cod_profesor'
+        public string? CodProfesor { get; set; }
         public string? Departamento { get; set; }
         public string? Telefono { get; set; }
-        public string? UsuarioLogin { get; set; }
+
+        // --- FK Normalizada ---
+        public int? UsuarioId { get; set; }
+        [ForeignKey("UsuarioId")]
+        public Usuario? Usuario { get; set; }
+
+        public bool Activo { get; set; } = true;
     }
 }

@@ -20,7 +20,6 @@ namespace UPTMDigital.API.Controllers
 
         /// <summary>
         /// Mensajes de una asignatura específica (chat del aula).
-        /// Sin autenticación para permitir que cualquier miembro del aula lea.
         /// </summary>
         [HttpGet("{asignaturaId}")]
         public async Task<ActionResult<IEnumerable<Mensaje>>> GetMensajes(int asignaturaId)
@@ -34,16 +33,16 @@ namespace UPTMDigital.API.Controllers
         /// <summary>
         /// Retorna la lista de chats del usuario autenticado.
         /// Un "chat" = asignatura donde el usuario tiene inscripción o es profesor.
-        /// Se usa para la pantalla de lista de conversaciones.
         /// </summary>
         [Authorize]
         [HttpGet("mis-chats")]
         public async Task<IActionResult> GetMisChats()
         {
-            var username = User.FindFirst(ClaimTypes.Name)?.Value;
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             var role = User.FindFirst(ClaimTypes.Role)?.Value;
 
-            if (string.IsNullOrEmpty(username)) return Unauthorized();
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var userId))
+                return Unauthorized();
 
             List<int> asignaturaIds;
 
@@ -51,7 +50,7 @@ namespace UPTMDigital.API.Controllers
             {
                 var profesor = await _context.Profesores
                     .AsNoTracking()
-                    .FirstOrDefaultAsync(p => p.UsuarioLogin == username);
+                    .FirstOrDefaultAsync(p => p.UsuarioId == userId);
 
                 if (profesor == null) return NotFound();
 
@@ -65,7 +64,7 @@ namespace UPTMDigital.API.Controllers
             {
                 var estudiante = await _context.Estudiantes
                     .AsNoTracking()
-                    .FirstOrDefaultAsync(e => e.UsuarioLogin == username);
+                    .FirstOrDefaultAsync(e => e.UsuarioId == userId);
 
                 if (estudiante == null) return NotFound();
 
@@ -106,9 +105,17 @@ namespace UPTMDigital.API.Controllers
         /// <summary>
         /// Envía un mensaje en el chat de una asignatura.
         /// </summary>
+        [Authorize]
         [HttpPost]
         public async Task<ActionResult<Mensaje>> PostMensaje(Mensaje mensaje)
         {
+            // Set UsuarioId from JWT
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!string.IsNullOrEmpty(userIdStr) && int.TryParse(userIdStr, out var userId))
+            {
+                mensaje.UsuarioId = userId;
+            }
+
             mensaje.FechaEnvio = DateTime.UtcNow;
             _context.Mensajes.Add(mensaje);
             await _context.SaveChangesAsync();

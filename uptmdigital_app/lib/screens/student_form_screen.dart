@@ -28,7 +28,7 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
     _nombresController = TextEditingController(text: widget.estudiante?.nombres ?? '');
     _apellidosController = TextEditingController(text: widget.estudiante?.apellidos ?? '');
     _correoController = TextEditingController(text: widget.estudiante?.correoInstitucional ?? '');
-    _carreraController = TextEditingController(text: widget.estudiante?.carrera ?? '');
+    _carreraController = TextEditingController(text: widget.estudiante?.carreraId?.toString() ?? '');
     _loadCarreras();
   }
 
@@ -61,7 +61,7 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
       'nombres': _nombresController.text,
       'apellidos': _apellidosController.text,
       'correoInstitucional': _correoController.text,
-      'carrera': _carreraController.text,
+      'carreraId': int.tryParse(_carreraController.text),
       // Add other fields if necessary, backend might expect them
     };
 
@@ -133,7 +133,7 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
                 decoration: const InputDecoration(labelText: 'Carrera'),
                 items: _carrerasList.map<DropdownMenuItem<String>>((item) {
                   return DropdownMenuItem<String>(
-                    value: item['nombre'], // Storing Name as Estudiante model uses String
+                    value: item['idCarrera']?.toString(), // Storing Id as the backend expects CarreraId
                     child: Text(item['nombre']),
                   );
                 }).toList(),

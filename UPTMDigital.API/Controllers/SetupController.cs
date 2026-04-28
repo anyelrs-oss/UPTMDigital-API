@@ -184,11 +184,10 @@ namespace UPTMDigital.API.Controllers
 
         private async Task EnsureProfesorProfileAsync(string username, List<string> log)
         {
-            var profile = await _context.Profesores.FirstOrDefaultAsync(p => p.UsuarioLogin == username);
-            if (profile != null)
-            {
-                return;
-            }
+            var usr = await _context.Usuarios.FirstOrDefaultAsync(u => u.NombreUsuario == username);
+            if (usr == null) return;
+            var profile = await _context.Profesores.FirstOrDefaultAsync(p => p.UsuarioId == usr.IdUsuario);
+            if (profile != null) return;
 
             _context.Profesores.Add(new Profesor
             {
@@ -198,18 +197,17 @@ namespace UPTMDigital.API.Controllers
                 CorreoInstitucional = "tester.prof@uptm.edu.ve",
                 Departamento = "Informatica",
                 Telefono = "0412-4444444",
-                UsuarioLogin = username
+                UsuarioId = usr.IdUsuario
             });
             log.Add($"Created professor profile linked to '{username}'.");
         }
 
         private async Task EnsureEstudianteProfileAsync(string username, List<string> log)
         {
-            var profile = await _context.Estudiantes.FirstOrDefaultAsync(e => e.UsuarioLogin == username);
-            if (profile != null)
-            {
-                return;
-            }
+            var usr = await _context.Usuarios.FirstOrDefaultAsync(u => u.NombreUsuario == username);
+            if (usr == null) return;
+            var profile = await _context.Estudiantes.FirstOrDefaultAsync(e => e.UsuarioId == usr.IdUsuario);
+            if (profile != null) return;
 
             _context.Estudiantes.Add(new Estudiante
             {
@@ -217,11 +215,10 @@ namespace UPTMDigital.API.Controllers
                 Nombres = "Test",
                 Apellidos = "Estudiante",
                 CorreoInstitucional = "tester.est@uptm.edu.ve",
-                Carrera = "Informatica",
                 Direccion = "Merida",
                 Telefono = "0412-5555555",
                 FechaRegistro = DateTime.UtcNow,
-                UsuarioLogin = username
+                UsuarioId = usr.IdUsuario
             });
             log.Add($"Created student profile linked to '{username}'.");
         }
@@ -251,8 +248,13 @@ namespace UPTMDigital.API.Controllers
                 foreach (var (lg, ced, nom, ape, cor, dep, cod, tel) in profData) {
                     if (!await _context.Usuarios.AnyAsync(u => u.NombreUsuario == lg))
                         _context.Usuarios.Add(new Usuario { NombreUsuario=lg, ContrasenaHash="123456", RolId=rolProf.IdRol, EstadoCuenta=true, UltimoAcceso=DateTime.UtcNow });
-                    if (!await _context.Profesores.AnyAsync(x => x.Cedula == ced))
-                        _context.Profesores.Add(new Profesor { Cedula=ced, Nombres=nom, Apellidos=ape, CorreoInstitucional=cor, Departamento=dep, CodProfesor=cod, Telefono=tel, UsuarioLogin=lg });
+                }
+                await _context.SaveChangesAsync();
+                foreach (var (lg, ced, nom, ape, cor, dep, cod, tel) in profData) {
+                    if (!await _context.Profesores.AnyAsync(x => x.Cedula == ced)) {
+                        var usr = await _context.Usuarios.FirstAsync(u => u.NombreUsuario == lg);
+                        _context.Profesores.Add(new Profesor { Cedula=ced, Nombres=nom, Apellidos=ape, CorreoInstitucional=cor, Departamento=dep, CodProfesor=cod, Telefono=tel, UsuarioId=usr.IdUsuario });
+                    }
                 }
                 await _context.SaveChangesAsync();
                 log.Add($"Profesores: {profData.Length} asegurados.");
@@ -268,8 +270,13 @@ namespace UPTMDigital.API.Controllers
                 foreach (var (lg, ced, nom, ape, cor, car, coda, dir, tel) in estData) {
                     if (!await _context.Usuarios.AnyAsync(u => u.NombreUsuario == lg))
                         _context.Usuarios.Add(new Usuario { NombreUsuario=lg, ContrasenaHash="123456", RolId=rolEst.IdRol, EstadoCuenta=true, UltimoAcceso=DateTime.UtcNow });
-                    if (!await _context.Estudiantes.AnyAsync(x => x.Cedula == ced))
-                        _context.Estudiantes.Add(new Estudiante { Cedula=ced, Nombres=nom, Apellidos=ape, CorreoInstitucional=cor, Carrera=car, CodAlumno=coda, Direccion=dir, Telefono=tel, FechaRegistro=DateTime.UtcNow, UsuarioLogin=lg });
+                }
+                await _context.SaveChangesAsync();
+                foreach (var (lg, ced, nom, ape, cor, car, coda, dir, tel) in estData) {
+                    if (!await _context.Estudiantes.AnyAsync(x => x.Cedula == ced)) {
+                        var usr = await _context.Usuarios.FirstAsync(u => u.NombreUsuario == lg);
+                        _context.Estudiantes.Add(new Estudiante { Cedula=ced, Nombres=nom, Apellidos=ape, CorreoInstitucional=cor, CodAlumno=coda, Direccion=dir, Telefono=tel, FechaRegistro=DateTime.UtcNow, UsuarioId=usr.IdUsuario });
+                    }
                 }
                 await _context.SaveChangesAsync();
                 log.Add($"Estudiantes: {estData.Length} asegurados.");
@@ -285,16 +292,16 @@ namespace UPTMDigital.API.Controllers
             var log = new List<string>();
             try
             {
-                var p1 = await _context.Profesores.FirstOrDefaultAsync(p => p.UsuarioLogin == "prof_garcia");
-                var p2 = await _context.Profesores.FirstOrDefaultAsync(p => p.UsuarioLogin == "prof_mendoza");
-                var p3 = await _context.Profesores.FirstOrDefaultAsync(p => p.UsuarioLogin == "prof_torres");
-                var p4 = await _context.Profesores.FirstOrDefaultAsync(p => p.UsuarioLogin == "prof_ramirez");
+                var p1 = await _context.Profesores.FirstOrDefaultAsync(p => p.Cedula == "V-12345678");
+                var p2 = await _context.Profesores.FirstOrDefaultAsync(p => p.Cedula == "V-18765432");
+                var p3 = await _context.Profesores.FirstOrDefaultAsync(p => p.Cedula == "V-14523678");
+                var p4 = await _context.Profesores.FirstOrDefaultAsync(p => p.Cedula == "V-20134576");
                 if (p1==null||p2==null||p3==null||p4==null)
                     return BadRequest(new { message="Ejecuta seed-base primero.", log });
 
                 async Task<Asignatura> GA(string cod, string nom, int cred, int sem, string dep, int pid) {
                     var a = await _context.Asignaturas.FirstOrDefaultAsync(x => x.Codigo == cod);
-                    if (a == null) { a = new Asignatura { Codigo=cod,Nombre=nom,Creditos=cred,Semestre=sem,Departamento=dep,ProfesorId=pid }; _context.Asignaturas.Add(a); await _context.SaveChangesAsync(); }
+                    if (a == null) { a = new Asignatura { Codigo=cod,Nombre=nom,Creditos=cred,Departamento=dep,ProfesorId=pid }; _context.Asignaturas.Add(a); await _context.SaveChangesAsync(); }
                     return a;
                 }
                 var a1  = await GA("INF101","Introducción a la Informática",  3,1,"Informática",   p1.IdProfesor);
@@ -326,30 +333,30 @@ namespace UPTMDigital.API.Controllers
                 }
 
                 if (!await _context.Inscripciones.AnyAsync()) {
-                    var e1 = await _context.Estudiantes.FirstAsync(e => e.UsuarioLogin=="est_rodriguez");
-                    var e2 = await _context.Estudiantes.FirstAsync(e => e.UsuarioLogin=="est_lopez");
-                    var e3 = await _context.Estudiantes.FirstAsync(e => e.UsuarioLogin=="est_fernandez");
-                    var e4 = await _context.Estudiantes.FirstAsync(e => e.UsuarioLogin=="est_perez");
-                    var e5 = await _context.Estudiantes.FirstAsync(e => e.UsuarioLogin=="est_morales");
-                    var e6 = await _context.Estudiantes.FirstAsync(e => e.UsuarioLogin=="est_vargas");
+                    var e1 = await _context.Estudiantes.FirstAsync(e => e.Cedula=="V-27112233");
+                    var e2 = await _context.Estudiantes.FirstAsync(e => e.Cedula=="V-28990011");
+                    var e3 = await _context.Estudiantes.FirstAsync(e => e.Cedula=="V-29445566");
+                    var e4 = await _context.Estudiantes.FirstAsync(e => e.Cedula=="V-26778899");
+                    var e5 = await _context.Estudiantes.FirstAsync(e => e.Cedula=="V-30123456");
+                    var e6 = await _context.Estudiantes.FirstAsync(e => e.Cedula=="V-25667788");
                     _context.Inscripciones.AddRange(
-                        new Inscripcion{EstudianteId=e1.IdEstudiante,AsignaturaId=a1.IdAsignatura,Periodo="2025-I",FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
-                        new Inscripcion{EstudianteId=e1.IdEstudiante,AsignaturaId=a2.IdAsignatura,Periodo="2025-I",FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
-                        new Inscripcion{EstudianteId=e1.IdEstudiante,AsignaturaId=a5.IdAsignatura,Periodo="2025-I",FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
-                        new Inscripcion{EstudianteId=e1.IdEstudiante,AsignaturaId=a9.IdAsignatura,Periodo="2025-I",FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
-                        new Inscripcion{EstudianteId=e2.IdEstudiante,AsignaturaId=a1.IdAsignatura,Periodo="2025-I",FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
-                        new Inscripcion{EstudianteId=e2.IdEstudiante,AsignaturaId=a2.IdAsignatura,Periodo="2025-I",FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
-                        new Inscripcion{EstudianteId=e2.IdEstudiante,AsignaturaId=a3.IdAsignatura,Periodo="2025-I",FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
-                        new Inscripcion{EstudianteId=e6.IdEstudiante,AsignaturaId=a3.IdAsignatura,Periodo="2025-I",FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
-                        new Inscripcion{EstudianteId=e6.IdEstudiante,AsignaturaId=a4.IdAsignatura,Periodo="2025-I",FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
-                        new Inscripcion{EstudianteId=e6.IdEstudiante,AsignaturaId=a10.IdAsignatura,Periodo="2025-I",FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
-                        new Inscripcion{EstudianteId=e3.IdEstudiante,AsignaturaId=a7.IdAsignatura,Periodo="2025-I",FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
-                        new Inscripcion{EstudianteId=e3.IdEstudiante,AsignaturaId=a8.IdAsignatura,Periodo="2025-I",FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
-                        new Inscripcion{EstudianteId=e3.IdEstudiante,AsignaturaId=a5.IdAsignatura,Periodo="2025-I",FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
-                        new Inscripcion{EstudianteId=e4.IdEstudiante,AsignaturaId=a7.IdAsignatura,Periodo="2025-I",FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
-                        new Inscripcion{EstudianteId=e4.IdEstudiante,AsignaturaId=a9.IdAsignatura,Periodo="2025-I",FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
-                        new Inscripcion{EstudianteId=e5.IdEstudiante,AsignaturaId=a8.IdAsignatura,Periodo="2025-I",FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
-                        new Inscripcion{EstudianteId=e5.IdEstudiante,AsignaturaId=a5.IdAsignatura,Periodo="2025-I",FechaInscripcion=DateTime.UtcNow,Estado="Activo"}
+                        new Inscripcion{EstudianteId=e1.IdEstudiante,AsignaturaId=a1.IdAsignatura,FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
+                        new Inscripcion{EstudianteId=e1.IdEstudiante,AsignaturaId=a2.IdAsignatura,FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
+                        new Inscripcion{EstudianteId=e1.IdEstudiante,AsignaturaId=a5.IdAsignatura,FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
+                        new Inscripcion{EstudianteId=e1.IdEstudiante,AsignaturaId=a9.IdAsignatura,FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
+                        new Inscripcion{EstudianteId=e2.IdEstudiante,AsignaturaId=a1.IdAsignatura,FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
+                        new Inscripcion{EstudianteId=e2.IdEstudiante,AsignaturaId=a2.IdAsignatura,FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
+                        new Inscripcion{EstudianteId=e2.IdEstudiante,AsignaturaId=a3.IdAsignatura,FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
+                        new Inscripcion{EstudianteId=e6.IdEstudiante,AsignaturaId=a3.IdAsignatura,FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
+                        new Inscripcion{EstudianteId=e6.IdEstudiante,AsignaturaId=a4.IdAsignatura,FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
+                        new Inscripcion{EstudianteId=e6.IdEstudiante,AsignaturaId=a10.IdAsignatura,FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
+                        new Inscripcion{EstudianteId=e3.IdEstudiante,AsignaturaId=a7.IdAsignatura,FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
+                        new Inscripcion{EstudianteId=e3.IdEstudiante,AsignaturaId=a8.IdAsignatura,FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
+                        new Inscripcion{EstudianteId=e3.IdEstudiante,AsignaturaId=a5.IdAsignatura,FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
+                        new Inscripcion{EstudianteId=e4.IdEstudiante,AsignaturaId=a7.IdAsignatura,FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
+                        new Inscripcion{EstudianteId=e4.IdEstudiante,AsignaturaId=a9.IdAsignatura,FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
+                        new Inscripcion{EstudianteId=e5.IdEstudiante,AsignaturaId=a8.IdAsignatura,FechaInscripcion=DateTime.UtcNow,Estado="Activo"},
+                        new Inscripcion{EstudianteId=e5.IdEstudiante,AsignaturaId=a5.IdAsignatura,FechaInscripcion=DateTime.UtcNow,Estado="Activo"}
                     );
                     await _context.SaveChangesAsync();
                     log.Add("Inscripciones: 17 creadas.");
@@ -366,16 +373,16 @@ namespace UPTMDigital.API.Controllers
             var log = new List<string>();
             try
             {
-                var e1 = await _context.Estudiantes.FirstOrDefaultAsync(e => e.UsuarioLogin=="est_rodriguez");
-                var e2 = await _context.Estudiantes.FirstOrDefaultAsync(e => e.UsuarioLogin=="est_lopez");
-                var e3 = await _context.Estudiantes.FirstOrDefaultAsync(e => e.UsuarioLogin=="est_fernandez");
-                var e4 = await _context.Estudiantes.FirstOrDefaultAsync(e => e.UsuarioLogin=="est_perez");
-                var e5 = await _context.Estudiantes.FirstOrDefaultAsync(e => e.UsuarioLogin=="est_morales");
-                var e6 = await _context.Estudiantes.FirstOrDefaultAsync(e => e.UsuarioLogin=="est_vargas");
-                var p1 = await _context.Profesores.FirstOrDefaultAsync(p => p.UsuarioLogin=="prof_garcia");
-                var p2 = await _context.Profesores.FirstOrDefaultAsync(p => p.UsuarioLogin=="prof_mendoza");
-                var p3 = await _context.Profesores.FirstOrDefaultAsync(p => p.UsuarioLogin=="prof_torres");
-                var p4 = await _context.Profesores.FirstOrDefaultAsync(p => p.UsuarioLogin=="prof_ramirez");
+                var e1 = await _context.Estudiantes.FirstOrDefaultAsync(e => e.Cedula=="V-27112233");
+                var e2 = await _context.Estudiantes.FirstOrDefaultAsync(e => e.Cedula=="V-28990011");
+                var e3 = await _context.Estudiantes.FirstOrDefaultAsync(e => e.Cedula=="V-29445566");
+                var e4 = await _context.Estudiantes.FirstOrDefaultAsync(e => e.Cedula=="V-26778899");
+                var e5 = await _context.Estudiantes.FirstOrDefaultAsync(e => e.Cedula=="V-30123456");
+                var e6 = await _context.Estudiantes.FirstOrDefaultAsync(e => e.Cedula=="V-25667788");
+                var p1 = await _context.Profesores.FirstOrDefaultAsync(p => p.Cedula=="V-12345678");
+                var p2 = await _context.Profesores.FirstOrDefaultAsync(p => p.Cedula=="V-18765432");
+                var p3 = await _context.Profesores.FirstOrDefaultAsync(p => p.Cedula=="V-14523678");
+                var p4 = await _context.Profesores.FirstOrDefaultAsync(p => p.Cedula=="V-20134576");
                 if (e1==null||p1==null)
                     return BadRequest(new { message="Ejecuta seed-base y seed-academico primero.", log });
 
@@ -473,7 +480,6 @@ namespace UPTMDigital.API.Controllers
         }
 
         [HttpPost("apply-changes")]
-        [HttpPost("apply-changes")]
         public async Task<IActionResult> ApplyChanges()
         {
             var log = new List<string>();
@@ -522,7 +528,7 @@ namespace UPTMDigital.API.Controllers
                 }
 
                 // Ensure Profile
-                if (!await _context.Profesores.AnyAsync(p => p.UsuarioLogin == "profesor1"))
+                if (!await _context.Profesores.AnyAsync(p => p.Cedula == "V-99999991"))
                 {
                     var newProf = new Profesor
                     {
@@ -531,7 +537,7 @@ namespace UPTMDigital.API.Controllers
                         Apellidos = "Profesor",
                         CorreoInstitucional = "juan@uptm.edu.ve",
                         Telefono = "0412-1111111",
-                        UsuarioLogin = "profesor1",
+                        UsuarioId = profesorUser.IdUsuario,
                         Departamento = "Informatica"
                     };
                     _context.Profesores.Add(newProf);
@@ -552,7 +558,7 @@ namespace UPTMDigital.API.Controllers
                         log.Add("Created user 'estudiante1'");
 
                         // Ensure Student Profile
-                        if (!await _context.Estudiantes.AnyAsync(e => e.UsuarioLogin == "estudiante1"))
+                        if (!await _context.Estudiantes.AnyAsync(e => e.Cedula == "V-15000000"))
                         {
                             var newEst = new Estudiante
                             {
@@ -561,7 +567,7 @@ namespace UPTMDigital.API.Controllers
                                 Apellidos = "Estudiante",
                                 CorreoInstitucional = "angel@uptm.edu.ve",
                                 Direccion = "Mérida",
-                                UsuarioLogin = "estudiante1"
+                                UsuarioId = estudianteUser.IdUsuario
                             };
                             _context.Estudiantes.Add(newEst);
                             await _context.SaveChangesAsync();
@@ -573,9 +579,9 @@ namespace UPTMDigital.API.Controllers
                 {
                     // Link to first student if not linked
                     var estudiante = await _context.Estudiantes.OrderBy(e => e.IdEstudiante).FirstOrDefaultAsync();
-                    if (estudiante != null && string.IsNullOrEmpty(estudiante.UsuarioLogin))
+                    if (estudiante != null && estudiante.UsuarioId == null)
                     {
-                        estudiante.UsuarioLogin = "estudiante1";
+                        estudiante.UsuarioId = estudianteUser.IdUsuario;
                         _context.Entry(estudiante).State = EntityState.Modified;
                         log.Add($"Linked user 'estudiante1' to Student ID {estudiante.IdEstudiante} ({estudiante.Nombres})");
                     }
@@ -616,7 +622,7 @@ namespace UPTMDigital.API.Controllers
                             Apellidos = "Docente",
                             CorreoInstitucional = "maria@uptm.edu.ve",
                             Telefono = "0412-2222222",
-                            UsuarioLogin = "profesor2"
+                            UsuarioId = prof2User.IdUsuario
                         };
                         _context.Profesores.Add(newProf);
                         await _context.SaveChangesAsync();
@@ -644,7 +650,7 @@ namespace UPTMDigital.API.Controllers
                             Apellidos = "Alumno",
                             CorreoInstitucional = "carlos@uptm.edu.ve",
                             Direccion = "Centro",
-                            UsuarioLogin = "estudiante2"
+                            UsuarioId = est2User.IdUsuario
                         };
                         _context.Estudiantes.Add(newEst);
                         await _context.SaveChangesAsync();
@@ -683,10 +689,10 @@ namespace UPTMDigital.API.Controllers
                 }
 
                 // 3.2 Asignaturas & Links
-                var p1 = await _context.Profesores.FirstOrDefaultAsync(p => p.UsuarioLogin == "profesor1");
-                var p2 = await _context.Profesores.FirstOrDefaultAsync(p => p.UsuarioLogin == "profesor2");
-                var e1 = await _context.Estudiantes.FirstOrDefaultAsync(e => e.UsuarioLogin == "estudiante1");
-                var e2 = await _context.Estudiantes.FirstOrDefaultAsync(e => e.UsuarioLogin == "estudiante2");
+                var p1 = await _context.Profesores.FirstOrDefaultAsync(p => p.Cedula == "V-99999991");
+                var p2 = await _context.Profesores.FirstOrDefaultAsync(p => p.Cedula == "V-22222222");
+                var e1 = await _context.Estudiantes.FirstOrDefaultAsync(e => e.Cedula == "V-15000000");
+                var e2 = await _context.Estudiantes.FirstOrDefaultAsync(e => e.Cedula == "V-33333333");
 
                 if (p1 != null && p2 != null && e1 != null && e2 != null)
                 {
@@ -701,7 +707,7 @@ namespace UPTMDigital.API.Controllers
                         var a = await _context.Asignaturas.FirstOrDefaultAsync(x => x.Codigo == code);
                         if (a == null)
                         {
-                            a = new Asignatura { Codigo = code, Nombre = name, Semestre = sem, Creditos = cred, Departamento = "General", ProfesorId = profId };
+                            a = new Asignatura { Codigo = code, Nombre = name, Creditos = cred, Departamento = "General", ProfesorId = profId };
                             _context.Asignaturas.Add(a);
                         }
                         return a;
@@ -720,7 +726,7 @@ namespace UPTMDigital.API.Controllers
                     async Task EnsureInscripcion(int estId, int asigId)
                     {
                         if (!await _context.Inscripciones.AnyAsync(i => i.EstudianteId == estId && i.AsignaturaId == asigId))
-                            _context.Inscripciones.Add(new Inscripcion { EstudianteId = estId, AsignaturaId = asigId, Periodo = "2025-I", FechaInscripcion = DateTime.Now, Estado = "Inscrito" });
+                            _context.Inscripciones.Add(new Inscripcion { EstudianteId = estId, AsignaturaId = asigId,  FechaInscripcion = DateTime.Now, Estado = "Inscrito" });
                     }
 
                     // E1: All Sem 1
@@ -804,7 +810,9 @@ namespace UPTMDigital.API.Controllers
                         new RegistroInstitucional { Cedula = "V-20000001", Nombres = "Diego", Apellidos = "Martinez", CarreraDepartamento = "Informatica", RolEsperado = "Estudiante", CorreoInstitucional = "diego@uptm.edu.ve" },
                         new RegistroInstitucional { Cedula = "V-20000002", Nombres = "Laura", Apellidos = "Sofia", CarreraDepartamento = "Administracion", RolEsperado = "Estudiante", CorreoInstitucional = "laura@uptm.edu.ve" },
                         // Unregistered Professor
-                        new RegistroInstitucional { Cedula = "V-10000001", Nombres = "Roberto", Apellidos = "Gomez", CarreraDepartamento = "Matematica", RolEsperado = "Profesor", CorreoInstitucional = "roberto@uptm.edu.ve" }
+                        new RegistroInstitucional { Cedula = "V-10000001", Nombres = "Roberto", Apellidos = "Gomez", CarreraDepartamento = "Matematica", RolEsperado = "Profesor", CorreoInstitucional = "roberto@uptm.edu.ve" },
+                        // Unregistered Seguridad
+                        new RegistroInstitucional { Cedula = "V-30000001", Nombres = "Carlos", Apellidos = "Guardia", CarreraDepartamento = "Vigilancia", RolEsperado = "Seguridad", CorreoInstitucional = "carlos.guardia@uptm.edu.ve" }
                     );
                     log.Add("Seeded RegistroInstitucional with 3 mock records.");
                 }
@@ -829,63 +837,34 @@ namespace UPTMDigital.API.Controllers
                 if (await _context.Notificaciones.AnyAsync())
                     return Ok(new { message = "Las notificaciones ya existen. Omitiendo.", log });
 
-                // Usuarios del seed-base + testers
-                var usuarios = new[]
-                {
-                    "est_rodriguez", "est_lopez", "est_fernandez", "est_perez", "est_morales", "est_vargas",
-                    "prof_garcia",   "prof_mendoza", "prof_torres", "prof_ramirez",
-                    "tester_est",    "tester_prof"
-                };
-
+                var userMap = await _context.Usuarios.ToDictionaryAsync(u => u.NombreUsuario, u => u.IdUsuario);
                 var now = DateTime.UtcNow;
                 var notificaciones = new List<Notificacion>();
 
-                // Notificaciones de Sistema (para todos)
-                foreach (var u in usuarios)
+                foreach (var kvp in userMap)
                 {
-                    notificaciones.Add(new Notificacion { DestinatarioLogin = u, Titulo = "Bienvenido a UPTM Digital", Cuerpo = "Tu cuenta ha sido activada. Explora todas las funciones disponibles.", Tipo = "Sistema", Leida = true,  FechaCreacion = now.AddDays(-30) });
-                    notificaciones.Add(new Notificacion { DestinatarioLogin = u, Titulo = "Mantenimiento programado", Cuerpo = "El sistema estará en mantenimiento el sábado 15/03 de 8:00 a 12:00. Planifica con anticipación.", Tipo = "Sistema", Leida = false, FechaCreacion = now.AddDays(-5) });
+                    notificaciones.Add(new Notificacion { UsuarioId = kvp.Value, Titulo = "Bienvenido a UPTM Digital", Cuerpo = "Tu cuenta ha sido activada.", Tipo = "Sistema", Leida = true, FechaCreacion = now.AddDays(-30) });
+                    notificaciones.Add(new Notificacion { UsuarioId = kvp.Value, Titulo = "Mantenimiento programado", Cuerpo = "Mantenimiento el sábado 15/03.", Tipo = "Sistema", Leida = false, FechaCreacion = now.AddDays(-5) });
                 }
 
-                // Notificaciones Académicas para Estudiantes
-                var estNots = new[]
-                {
-                    ("est_rodriguez", "Nueva nota publicada",        "Tu nota de Introducción a la Informática ha sido registrada: 18 pts.",          "Academica", 20),
-                    ("est_rodriguez", "Nueva nota publicada",        "Tu nota de Algoritmos y Programación I ha sido registrada: 16 pts.",             "Academica", 15),
-                    ("est_rodriguez", "Recordatorio de asistencia",  "Recuerda que tienes clase de Cálculo I mañana a las 07:00 en Aula 05.",        "Academica",  1),
-                    ("est_lopez",     "Nueva nota publicada",        "Tu nota de Introducción a la Informática ha sido registrada: 20 pts. ¡Perfecto!", "Academica", 20),
-                    ("est_lopez",     "Nueva nota publicada",        "Tu nota de POO ha sido registrada: 17 pts.",                                      "Academica",  8),
-                    ("est_fernandez", "Constancia lista",            "Tu constancia de estudio está lista para ser retirada en Coordinación.",         "Academica", 10),
-                    ("est_fernandez", "Nueva nota publicada",        "Tu nota de Administración ha sido registrada: 19 pts.",                           "Academica", 12),
-                    ("est_morales",   "Alerta académica",            "Tu nota de Contabilidad General está por debajo del mínimo aprobatorio (11 pts). Habla con tu profesor.", "Academica", 5),
-                    ("est_vargas",    "Nueva nota publicada",        "Tu nota de POO ha sido registrada: 18 pts.",                                      "Academica",  8),
-                    ("tester_est",    "Perfil completado",           "Tu perfil de estudiante está completo. ¡Ya puedes usar todas las funciones!",     "Academica",  2),
+                var nots = new[] {
+                    ("est_rodriguez", "Nueva nota publicada", "Nota de Informática: 18 pts.", "Academica", 20),
+                    ("est_lopez",     "Nueva nota publicada", "Nota de Informática: 20 pts.", "Academica", 20),
+                    ("prof_garcia",   "Nuevo mensaje en chat","Pregunta en INF101.",           "Chat",      1),
                 };
-
-                foreach (var (login, titulo, cuerpo, tipo, dias) in estNots)
-                    notificaciones.Add(new Notificacion { DestinatarioLogin = login, Titulo = titulo, Cuerpo = cuerpo, Tipo = tipo, Leida = false, FechaCreacion = now.AddDays(-dias) });
-
-                // Notificaciones para Profesores
-                var profNots = new[]
-                {
-                    ("prof_garcia",   "Nuevo mensaje en chat",       "Un estudiante te ha enviado una pregunta en el chat de INF101.",                 "Chat",      1),
-                    ("prof_garcia",   "Recordatorio: notas pendientes", "Faltan 3 días para la fecha límite de registro del primer corte.",              "Academica", 3),
-                    ("prof_mendoza",  "Nuevo mensaje en chat",       "Un estudiante te ha enviado un mensaje en el chat de MAT101.",                   "Chat",      2),
-                    ("prof_torres",   "Recordatorio: notas pendientes", "Tienes 2 estudiantes sin nota registrada en POO.",                              "Academica", 4),
-                    ("prof_ramirez",  "Nuevo estudiante inscrito",   "Un nuevo estudiante se inscribió en ADM101 este período.",                        "Academica", 7),
-                    ("tester_prof",   "Bienvenido, Profesor",        "Tu cuenta de profesor está activa. Empieza registrando las notas del período.",  "Sistema",   1),
-                };
-
-                foreach (var (login, titulo, cuerpo, tipo, dias) in profNots)
-                    notificaciones.Add(new Notificacion { DestinatarioLogin = login, Titulo = titulo, Cuerpo = cuerpo, Tipo = tipo, Leida = false, FechaCreacion = now.AddDays(-dias) });
+                foreach (var (login, titulo, cuerpo, tipo, dias) in nots)
+                    if (userMap.TryGetValue(login, out var uid))
+                        notificaciones.Add(new Notificacion { UsuarioId = uid, Titulo = titulo, Cuerpo = cuerpo, Tipo = tipo, Leida = false, FechaCreacion = now.AddDays(-dias) });
 
                 _context.Notificaciones.AddRange(notificaciones);
                 await _context.SaveChangesAsync();
                 log.Add($"Notificaciones: {notificaciones.Count} creadas.");
             }
             catch (Exception ex) { return StatusCode(500, new { step = "seed-notificaciones", error = ex.Message, log }); }
-            return Ok(new { message = "✅ Notificaciones sembradas correctamente.", log });
+            return Ok(new { message = "Notificaciones sembradas.", log });
         }
+
+
 
         // ── SEED MENSAJES V2 (conversaciones realistas) ──────────────────────────
         [HttpPost("seed-mensajes-v2")]

@@ -628,4 +628,56 @@ class ApiService {
       return false;
     }
   }
+
+  // --- USUARIOS (Admin) ---
+
+  Future<List<dynamic>> getUsuarios({String? search, String? rol, bool? activo}) async {
+    try {
+      final params = <String, dynamic>{};
+      if (search != null && search.isNotEmpty) params['search'] = search;
+      if (rol != null) params['rol'] = rol;
+      if (activo != null) params['activo'] = activo.toString();
+
+      final response = await _dio.get('/api/usuarios', queryParameters: params);
+      return response.statusCode == 200 ? response.data as List : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<bool> updateUsuario(int id, Map<String, dynamic> data) async {
+    try {
+      await _dio.put('/api/usuarios/$id', data: data);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> deleteUsuario(int id) async {
+    try {
+      await _dio.delete('/api/usuarios/$id');
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> resetPasswordUsuario(int id, String newPassword) async {
+    try {
+      await _dio.post('/api/usuarios/$id/reset-password', data: {"nuevaContrasena": newPassword});
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<List<dynamic>> getRoles() async {
+    try {
+      final response = await _dio.get('/api/admindata/roles');
+      return response.statusCode == 200 ? response.data as List : [];
+    } catch (e) {
+      return [];
+    }
+  }
 }

@@ -29,7 +29,7 @@ class _InscripcionFormScreenState extends State<InscripcionFormScreen> {
   @override
   void initState() {
     super.initState();
-    _periodoController = TextEditingController(text: widget.inscripcion?.periodo ?? '');
+    _periodoController = TextEditingController(text: widget.inscripcion?.periodoNombre ?? '');
     _estadoController = TextEditingController(text: widget.inscripcion?.estado ?? 'Inscrito');
     _selectedEstudianteId = widget.inscripcion?.estudianteId;
     _selectedAsignaturaId = widget.inscripcion?.asignaturaId;

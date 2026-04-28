@@ -14,6 +14,7 @@ namespace UPTMDigital.API.Models
         public int RolId { get; set; }
         public bool EstadoCuenta { get; set; } = true;
         public DateTime? UltimoAcceso { get; set; }
+        public bool Activo { get; set; } = true;
 
         public Rol Rol { get; set; } = null!;
     }

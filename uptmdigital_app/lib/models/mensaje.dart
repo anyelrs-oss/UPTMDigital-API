@@ -4,6 +4,7 @@ class Mensaje {
   final String content;
   final String fechaEnvio;
   final String emisorNombre;
+  final int? usuarioId;
 
   Mensaje({
     required this.idMensaje,
@@ -11,6 +12,7 @@ class Mensaje {
     required this.content,
     required this.fechaEnvio,
     required this.emisorNombre,
+    this.usuarioId,
   });
 
   factory Mensaje.fromJson(Map<String, dynamic> json) {
@@ -19,7 +21,8 @@ class Mensaje {
       asignaturaId: json['asignaturaId'],
       content: json['contenido'],
       fechaEnvio: json['fechaEnvio'],
-      emisorNombre: json['emisorNombre'],
+      emisorNombre: json['emisorNombre'] ?? '',
+      usuarioId: json['usuarioId'],
     );
   }
 }

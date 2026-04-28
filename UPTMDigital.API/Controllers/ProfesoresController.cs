@@ -20,26 +20,48 @@ namespace UPTMDigital.API.Controllers
             _context = context;
         }
 
-        // GET: api/profesores
+        // GET: api/profesores?search=&departamento=&activo=
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Profesor>>> GetProfesores()
+        public async Task<ActionResult<IEnumerable<Profesor>>> GetProfesores(
+            [FromQuery] string? search,
+            [FromQuery] string? departamento,
+            [FromQuery] bool? activo)
         {
-            return await _context.Profesores.ToListAsync();
+            var query = _context.Profesores.AsQueryable();
+
+            if (activo.HasValue)
+                query = query.Where(p => p.Activo == activo.Value);
+            else
+                query = query.Where(p => p.Activo);
+
+            if (!string.IsNullOrEmpty(search))
+            {
+                var s = search.ToLower();
+                query = query.Where(p =>
+                    p.Nombres.ToLower().Contains(s) ||
+                    p.Apellidos.ToLower().Contains(s) ||
+                    p.Cedula.ToLower().Contains(s));
+            }
+
+            if (!string.IsNullOrEmpty(departamento))
+                query = query.Where(p => p.Departamento != null && p.Departamento.ToLower().Contains(departamento.ToLower()));
+
+            return await query.OrderBy(p => p.Apellidos).ToListAsync();
         }
 
         // GET: api/profesores/me
         [HttpGet("me")]
         public async Task<ActionResult<Profesor>> GetMe()
         {
-            var username = User.FindFirst(ClaimTypes.Name)?.Value;
-            if (string.IsNullOrEmpty(username)) return Unauthorized();
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var userId)) return Unauthorized();
 
             Profesor? profesor;
             try
             {
                 profesor = await _context.Profesores
                     .AsNoTracking()
-                    .FirstOrDefaultAsync(p => p.UsuarioLogin == username);
+                    .FirstOrDefaultAsync(p => p.UsuarioId == userId);
             }
             catch (Exception ex) when (IsTransientDbException(ex))
             {
@@ -60,12 +82,12 @@ namespace UPTMDigital.API.Controllers
         [HttpGet("me/asignaturas")]
         public async Task<IActionResult> GetMisAsignaturas()
         {
-            var username = User.FindFirst(ClaimTypes.Name)?.Value;
-            if (string.IsNullOrEmpty(username)) return Unauthorized();
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var userId)) return Unauthorized();
 
             var profesor = await _context.Profesores
                 .AsNoTracking()
-                .FirstOrDefaultAsync(p => p.UsuarioLogin == username);
+                .FirstOrDefaultAsync(p => p.UsuarioId == userId);
 
             if (profesor == null) return NotFound();
 
@@ -92,12 +114,12 @@ namespace UPTMDigital.API.Controllers
         [HttpGet("me/horario")]
         public async Task<IActionResult> GetMiHorario()
         {
-            var username = User.FindFirst(ClaimTypes.Name)?.Value;
-            if (string.IsNullOrEmpty(username)) return Unauthorized();
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var userId)) return Unauthorized();
 
             var profesor = await _context.Profesores
                 .AsNoTracking()
-                .FirstOrDefaultAsync(p => p.UsuarioLogin == username);
+                .FirstOrDefaultAsync(p => p.UsuarioId == userId);
 
             if (profesor == null) return NotFound();
 
@@ -197,20 +219,17 @@ namespace UPTMDigital.API.Controllers
             return NoContent();
         }
 
-        // DELETE: api/profesores/5
+        // DELETE: api/profesores/5 (soft delete)
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteProfesor(int id)
         {
             var profesor = await _context.Profesores.FindAsync(id);
-            if (profesor == null)
-            {
-                return NotFound();
-            }
+            if (profesor == null) return NotFound();
 
-            _context.Profesores.Remove(profesor);
+            profesor.Activo = false;
             await _context.SaveChangesAsync();
 
-            return NoContent();
+            return Ok(new { Message = "Profesor desactivado." });
         }
 
         private bool ProfesorExists(int id)

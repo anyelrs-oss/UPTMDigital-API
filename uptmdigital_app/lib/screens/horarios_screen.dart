@@ -69,7 +69,7 @@ class _HorariosScreenState extends State<HorariosScreen> {
                   margin: const EdgeInsets.only(bottom: 16),
                   child: ExpansionTile(
                     title: Text(asig.nombre, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text("${asig.codigo} - Semestre ${asig.semestre}"),
+                    subtitle: Text("${asig.codigo} - Semestre ${asig.semestreNombre}"),
                     children: [
                       if (horarios.isEmpty)
                         const Padding(padding: EdgeInsets.all(16), child: Text("No hay horarios asignados.")),

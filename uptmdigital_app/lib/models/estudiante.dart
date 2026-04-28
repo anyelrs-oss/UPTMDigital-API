@@ -4,7 +4,9 @@ class Estudiante {
   final String nombres;
   final String apellidos;
   final String correoInstitucional;
-  final String carrera;
+  final int? usuarioId;
+  final int? carreraId;
+  final String carreraNombre;
 
   Estudiante({
     required this.idEstudiante,
@@ -12,17 +14,29 @@ class Estudiante {
     required this.nombres,
     required this.apellidos,
     required this.correoInstitucional,
-    required this.carrera,
+    this.usuarioId,
+    this.carreraId,
+    this.carreraNombre = '',
   });
 
   factory Estudiante.fromJson(Map<String, dynamic> json) {
+    // carrera can be a nested object { nombre: "..." } or null
+    String carrera = '';
+    if (json['carrera'] is Map) {
+      carrera = json['carrera']['nombre'] ?? '';
+    } else if (json['carreraNombre'] is String) {
+      carrera = json['carreraNombre'];
+    }
+
     return Estudiante(
       idEstudiante: json['idEstudiante'] ?? 0,
       cedula: json['cedula'] ?? '',
       nombres: json['nombres'] ?? '',
       apellidos: json['apellidos'] ?? '',
       correoInstitucional: json['correoInstitucional'] ?? '',
-      carrera: json['carrera'] ?? '',
+      usuarioId: json['usuarioId'],
+      carreraId: json['carreraId'],
+      carreraNombre: carrera,
     );
   }
 }

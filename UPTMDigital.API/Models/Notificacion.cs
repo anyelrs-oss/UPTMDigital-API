@@ -13,9 +13,10 @@ namespace UPTMDigital.API.Models
         [Key]
         public int IdNotificacion { get; set; }
 
-        /// <summary>NombreUsuario del destinatario (FK a Usuario).</summary>
-        [Required]
-        public string DestinatarioLogin { get; set; } = null!;
+        // --- FK Normalizada ---
+        public int UsuarioId { get; set; }
+        [ForeignKey("UsuarioId")]
+        public Usuario? Usuario { get; set; }
 
         [Required]
         public string Titulo { get; set; } = null!;
@@ -23,7 +24,7 @@ namespace UPTMDigital.API.Models
         [Required]
         public string Cuerpo { get; set; } = null!;
 
-        /// <summary>Sistema | Academica | Chat</summary>
+        /// <summary>Sistema | Academica | Chat | Evaluacion</summary>
         public string Tipo { get; set; } = "Sistema";
 
         public bool Leida { get; set; } = false;

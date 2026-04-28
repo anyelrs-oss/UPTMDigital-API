@@ -5,6 +5,7 @@ class Profesor {
   final String apellidos;
   final String correoInstitucional;
   final String departamento;
+  final int? usuarioId;
 
   Profesor({
     required this.idProfesor,
@@ -13,6 +14,7 @@ class Profesor {
     required this.apellidos,
     required this.correoInstitucional,
     required this.departamento,
+    this.usuarioId,
   });
 
   factory Profesor.fromJson(Map<String, dynamic> json) {
@@ -23,6 +25,7 @@ class Profesor {
       apellidos: json['apellidos'] ?? '',
       correoInstitucional: json['correoInstitucional'] ?? '',
       departamento: json['departamento'] ?? '',
+      usuarioId: json['usuarioId'],
     );
   }
 }

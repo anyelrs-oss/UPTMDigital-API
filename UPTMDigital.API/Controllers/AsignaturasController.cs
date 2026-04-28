@@ -18,11 +18,36 @@ namespace UPTMDigital.API.Controllers
             _context = context;
         }
 
-        // GET: api/asignaturas
+        // GET: api/asignaturas?search=&departamento=&profesorId=&activo=
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Asignatura>>> GetAsignaturas()
+        public async Task<ActionResult<IEnumerable<Asignatura>>> GetAsignaturas(
+            [FromQuery] string? search,
+            [FromQuery] string? departamento,
+            [FromQuery] int? profesorId,
+            [FromQuery] bool? activo)
         {
-            return await _context.Asignaturas.ToListAsync();
+            var query = _context.Asignaturas.Include(a => a.Profesor).AsQueryable();
+
+            if (activo.HasValue)
+                query = query.Where(a => a.Activo == activo.Value);
+            else
+                query = query.Where(a => a.Activo);
+
+            if (!string.IsNullOrEmpty(search))
+            {
+                var s = search.ToLower();
+                query = query.Where(a =>
+                    a.Nombre.ToLower().Contains(s) ||
+                    a.Codigo.ToLower().Contains(s));
+            }
+
+            if (!string.IsNullOrEmpty(departamento))
+                query = query.Where(a => a.Departamento != null && a.Departamento.ToLower().Contains(departamento.ToLower()));
+
+            if (profesorId.HasValue)
+                query = query.Where(a => a.ProfesorId == profesorId.Value);
+
+            return await query.OrderBy(a => a.Nombre).ToListAsync();
         }
 
         // GET: api/asignaturas/5
@@ -79,20 +104,17 @@ namespace UPTMDigital.API.Controllers
             return NoContent();
         }
 
-        // DELETE: api/asignaturas/5
+        // DELETE: api/asignaturas/5 (soft delete)
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteAsignatura(int id)
         {
             var asignatura = await _context.Asignaturas.FindAsync(id);
-            if (asignatura == null)
-            {
-                return NotFound();
-            }
+            if (asignatura == null) return NotFound();
 
-            _context.Asignaturas.Remove(asignatura);
+            asignatura.Activo = false;
             await _context.SaveChangesAsync();
 
-            return NoContent();
+            return Ok(new { Message = "Asignatura desactivada." });
         }
 
         private bool AsignaturaExists(int id)
