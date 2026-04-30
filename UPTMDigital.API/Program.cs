@@ -12,6 +12,9 @@ using UPTMDigital.API.Data;
 var builder = WebApplication.CreateBuilder(args);
 var isDevelopment = builder.Environment.IsDevelopment();
 
+// Fix for Supabase / PostgreSQL pooler IPv6 timeout issues in Render
+AppContext.SetSwitch("System.Net.DisableIPv6", true);
+
 var dbCommandTimeoutSeconds = builder.Configuration.GetValue<int?>("DatabaseResilience:CommandTimeoutSeconds") ?? 45;
 var dbMaxRetryCount = builder.Configuration.GetValue<int?>("DatabaseResilience:MaxRetryCount") ?? 6;
 var dbMaxRetryDelaySeconds = builder.Configuration.GetValue<int?>("DatabaseResilience:MaxRetryDelaySeconds") ?? 15;
@@ -164,7 +167,9 @@ app.Use(async (context, next) =>
         context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
         await context.Response.WriteAsJsonAsync(new
         {
-            message = "Servicio temporalmente no disponible por latencia de base de datos. Intente nuevamente en unos segundos."
+            message = "Servicio temporalmente no disponible por latencia de base de datos. Intente nuevamente en unos segundos.",
+            error = ex.Message,
+            stack = ex.ToString()
         });
     }
 });
