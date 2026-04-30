@@ -479,6 +479,40 @@ namespace UPTMDigital.API.Controllers
             });
         }
 
+        [HttpPost("patch-activo")]
+        public async Task<IActionResult> PatchActivo()
+        {
+            var log = new List<string>();
+            try
+            {
+                var tables = new[] { "Usuario", "Profesor", "Estudiante", "Anuncio", "Asignatura", "Periodo", "Carreras", "Semestres" };
+                foreach (var t in tables)
+                {
+                    try
+                    {
+                        await _context.Database.ExecuteSqlRawAsync($"ALTER TABLE \"{t}\" ADD COLUMN IF NOT EXISTS \"Activo\" boolean NOT NULL DEFAULT true;");
+                        log.Add($"Patched {t} - added Activo column");
+                    }
+                    catch (Exception ex)
+                    {
+                        log.Add($"Warning on {t}: {ex.Message}");
+                    }
+                }
+                
+                try
+                {
+                    await _context.Database.ExecuteSqlRawAsync($"ALTER TABLE \"RegistrosInstitucionales\" ADD COLUMN IF NOT EXISTS \"Activo\" boolean NOT NULL DEFAULT true;");
+                    log.Add($"Patched RegistrosInstitucionales");
+                } catch {}
+
+                return Ok(new { message = "Patch completado", log });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = ex.Message, stack = ex.ToString(), log });
+            }
+        }
+
         [HttpPost("apply-changes")]
         public async Task<IActionResult> ApplyChanges()
         {
