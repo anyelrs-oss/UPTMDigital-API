@@ -989,5 +989,158 @@ namespace UPTMDigital.API.Controllers
             catch (Exception ex) { return StatusCode(500, new { step = "seed-mensajes-v2", error = ex.Message, log }); }
             return Ok(new { message = "✅ Mensajes realistas sembrados correctamente.", log });
         }
+
+        // ── SEED ALL: Ejecuta todos los pasos en secuencia ───────────────────────
+        [HttpPost("seed-all")]
+        public async Task<IActionResult> SeedAll()
+        {
+            var log = new List<string>();
+            try
+            {
+                // Paso 1: Base
+                var r1 = await SeedBase() as OkObjectResult;
+                if (r1 == null) return StatusCode(500, new { step = "seed-base", message = "seed-base falló.", log });
+                log.Add("✅ Paso 1 (seed-base) completado.");
+
+                // Paso 2: Académico
+                var r2 = await SeedAcademico() as OkObjectResult;
+                if (r2 == null) return StatusCode(500, new { step = "seed-academico", message = "seed-academico falló.", log });
+                log.Add("✅ Paso 2 (seed-academico) completado.");
+
+                // Paso 3: Extra
+                var r3 = await SeedExtra() as OkObjectResult;
+                if (r3 == null) return StatusCode(500, new { step = "seed-extra", message = "seed-extra falló.", log });
+                log.Add("✅ Paso 3 (seed-extra) completado.");
+
+                // Paso 4: Notificaciones
+                var r4 = await SeedNotificaciones() as OkObjectResult;
+                if (r4 == null) return StatusCode(500, new { step = "seed-notificaciones", message = "seed-notificaciones falló.", log });
+                log.Add("✅ Paso 4 (seed-notificaciones) completado.");
+
+                // Paso 5: Mensajes
+                var r5 = await SeedMensajesV2() as OkObjectResult;
+                if (r5 == null) return StatusCode(500, new { step = "seed-mensajes", message = "seed-mensajes falló.", log });
+                log.Add("✅ Paso 5 (seed-mensajes) completado.");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = ex.Message, log });
+            }
+
+            return Ok(new
+            {
+                message = "🎓 ¡Base de datos completamente poblada para la mesa técnica!",
+                credenciales = new[]
+                {
+                    new { usuario = "prof_garcia",    pass = "123456", rol = "Profesor",    nombre = "Carlos García" },
+                    new { usuario = "prof_mendoza",   pass = "123456", rol = "Profesor",    nombre = "María Mendoza" },
+                    new { usuario = "prof_torres",    pass = "123456", rol = "Profesor",    nombre = "Luis Torres" },
+                    new { usuario = "prof_ramirez",   pass = "123456", rol = "Profesor",    nombre = "Ana Ramírez" },
+                    new { usuario = "est_rodriguez",  pass = "123456", rol = "Estudiante",  nombre = "Daniela Rodríguez" },
+                    new { usuario = "est_lopez",      pass = "123456", rol = "Estudiante",  nombre = "Andrés López" },
+                    new { usuario = "est_fernandez",  pass = "123456", rol = "Estudiante",  nombre = "Valentina Fernández" },
+                    new { usuario = "est_perez",      pass = "123456", rol = "Estudiante",  nombre = "Miguel Pérez" },
+                    new { usuario = "est_morales",    pass = "123456", rol = "Estudiante",  nombre = "Gabriela Morales" },
+                    new { usuario = "est_vargas",     pass = "123456", rol = "Estudiante",  nombre = "José Vargas" },
+                },
+                log
+            });
+        }
+
+        // ── STATUS: Resumen del estado actual de la BD ────────────────────────────
+        [HttpGet("status")]
+        public async Task<IActionResult> Status()
+        {
+            try
+            {
+                var status = new
+                {
+                    roles           = await _context.Roles.CountAsync(),
+                    usuarios        = await _context.Usuarios.CountAsync(),
+                    profesores      = await _context.Profesores.CountAsync(),
+                    estudiantes     = await _context.Estudiantes.CountAsync(),
+                    asignaturas     = await _context.Asignaturas.CountAsync(),
+                    horarios        = await _context.Horarios.CountAsync(),
+                    inscripciones   = await _context.Inscripciones.CountAsync(),
+                    notas           = await _context.Notas.CountAsync(),
+                    asistencias     = await _context.Asistencias.CountAsync(),
+                    anuncios        = await _context.Anuncios.CountAsync(),
+                    constancias     = await _context.Constancias.CountAsync(),
+                    notificaciones  = await _context.Notificaciones.CountAsync(),
+                    mensajes        = await _context.Mensajes.CountAsync(),
+                    controlAccesos  = await _context.ControlAccesos.CountAsync(),
+                    registrosInstitucionales = await _context.RegistrosInstitucionales.CountAsync(),
+                    listo_para_demo = true
+                };
+                return Ok(status);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = ex.Message });
+            }
+        }
+
+        // ── FIX: Crear FK faltante Horarios → Asignatura ─────────────────────────
+        [HttpPost("fix-horarios-fk")]
+        public async Task<IActionResult> FixHorariosForeignKey()
+        {
+            var log = new List<string>();
+            try
+            {
+                // 1. Crear el índice si no existe
+                await _context.Database.ExecuteSqlRawAsync(@"
+                    CREATE INDEX IF NOT EXISTS ""IX_Horarios_AsignaturaId""
+                    ON ""Horarios"" (""AsignaturaId"");
+                ");
+                log.Add("Índice IX_Horarios_AsignaturaId verificado/creado.");
+
+                // 2. Crear la FK si no existe (PostgreSQL no tiene IF NOT EXISTS para constraints)
+                await _context.Database.ExecuteSqlRawAsync(@"
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1 FROM information_schema.table_constraints
+                            WHERE constraint_name = 'FK_Horarios_Asignatura_AsignaturaId'
+                              AND table_name = 'Horarios'
+                        ) THEN
+                            ALTER TABLE ""Horarios""
+                            ADD CONSTRAINT ""FK_Horarios_Asignatura_AsignaturaId""
+                            FOREIGN KEY (""AsignaturaId"")
+                            REFERENCES ""Asignatura"" (""IdAsignatura"")
+                            ON DELETE CASCADE;
+                        END IF;
+                    END $$;
+                ");
+                log.Add("Foreign Key FK_Horarios_Asignatura_AsignaturaId verificada/creada.");
+
+                // 3. Verificar que el constraint existe ahora
+                var verification = await _context.Database
+                    .SqlQueryRaw<string>(@"
+                        SELECT constraint_name AS ""Value""
+                        FROM information_schema.table_constraints
+                        WHERE table_name = 'Horarios'
+                          AND constraint_type = 'FOREIGN KEY'
+                    ")
+                    .ToListAsync();
+
+                log.Add($"Constraints FK activos en Horarios: {string.Join(", ", verification)}");
+
+                return Ok(new
+                {
+                    message = "✅ FK Horarios → Asignatura corregida exitosamente.",
+                    log
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    step = "fix-horarios-fk",
+                    error = ex.Message,
+                    stack = ex.ToString(),
+                    log
+                });
+            }
+        }
     }
 }
