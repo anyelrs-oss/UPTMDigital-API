@@ -1047,37 +1047,73 @@ namespace UPTMDigital.API.Controllers
             });
         }
 
-        // ── STATUS: Resumen del estado actual de la BD ────────────────────────────
+        // ── STATUS: Resumen del estado actual de la BD (tolerante a tablas faltantes) ──
         [HttpGet("status")]
         public async Task<IActionResult> Status()
         {
+            async Task<object> SafeCount(Func<Task<int>> fn, string tabla)
+            {
+                try { return (object)await fn(); }
+                catch { return (object)$"❌ tabla '{tabla}' no existe"; }
+            }
+
+            var status = new Dictionary<string, object>
+            {
+                ["roles"]                    = await SafeCount(() => _context.Roles.CountAsync(),                    "Rol"),
+                ["usuarios"]                 = await SafeCount(() => _context.Usuarios.CountAsync(),                 "Usuario"),
+                ["profesores"]               = await SafeCount(() => _context.Profesores.CountAsync(),               "Profesor"),
+                ["estudiantes"]              = await SafeCount(() => _context.Estudiantes.CountAsync(),              "Estudiante"),
+                ["asignaturas"]              = await SafeCount(() => _context.Asignaturas.CountAsync(),              "Asignatura"),
+                ["horarios"]                 = await SafeCount(() => _context.Horarios.CountAsync(),                 "Horarios"),
+                ["inscripciones"]            = await SafeCount(() => _context.Inscripciones.CountAsync(),            "Inscripcion"),
+                ["notas"]                    = await SafeCount(() => _context.Notas.CountAsync(),                    "Nota"),
+                ["asistencias"]              = await SafeCount(() => _context.Asistencias.CountAsync(),              "Asistencia"),
+                ["anuncios"]                 = await SafeCount(() => _context.Anuncios.CountAsync(),                 "Anuncio"),
+                ["constancias"]              = await SafeCount(() => _context.Constancias.CountAsync(),              "Constancia"),
+                ["notificaciones"]           = await SafeCount(() => _context.Notificaciones.CountAsync(),           "Notificacion"),
+                ["mensajes"]                 = await SafeCount(() => _context.Mensajes.CountAsync(),                 "Mensaje"),
+                ["controlAccesos"]           = await SafeCount(() => _context.ControlAccesos.CountAsync(),           "ControlAcceso"),
+                ["registrosInstitucionales"] = await SafeCount(() => _context.RegistrosInstitucionales.CountAsync(), "RegistrosInstitucionales"),
+                ["listo_para_demo"]          = (object)true
+            };
+            return Ok(status);
+        }
+
+
+        // ── CREATE MISSING TABLES: crea con DDL directo las tablas que faltan ────
+        [HttpPost("create-missing-tables")]
+        public async Task<IActionResult> CreateMissingTables()
+        {
+            var log = new List<string>();
             try
             {
-                var status = new
-                {
-                    roles           = await _context.Roles.CountAsync(),
-                    usuarios        = await _context.Usuarios.CountAsync(),
-                    profesores      = await _context.Profesores.CountAsync(),
-                    estudiantes     = await _context.Estudiantes.CountAsync(),
-                    asignaturas     = await _context.Asignaturas.CountAsync(),
-                    horarios        = await _context.Horarios.CountAsync(),
-                    inscripciones   = await _context.Inscripciones.CountAsync(),
-                    notas           = await _context.Notas.CountAsync(),
-                    asistencias     = await _context.Asistencias.CountAsync(),
-                    anuncios        = await _context.Anuncios.CountAsync(),
-                    constancias     = await _context.Constancias.CountAsync(),
-                    notificaciones  = await _context.Notificaciones.CountAsync(),
-                    mensajes        = await _context.Mensajes.CountAsync(),
-                    controlAccesos  = await _context.ControlAccesos.CountAsync(),
-                    registrosInstitucionales = await _context.RegistrosInstitucionales.CountAsync(),
-                    listo_para_demo = true
-                };
-                return Ok(status);
+                // Tabla Notificacion
+                await _context.Database.ExecuteSqlRawAsync(@"
+                    CREATE TABLE IF NOT EXISTS ""Notificacion"" (
+                        ""IdNotificacion""  SERIAL       PRIMARY KEY,
+                        ""UsuarioId""       INTEGER      NOT NULL REFERENCES ""Usuario""(""IdUsuario"") ON DELETE CASCADE,
+                        ""Titulo""          TEXT         NOT NULL,
+                        ""Cuerpo""          TEXT         NOT NULL,
+                        ""Tipo""            TEXT         NOT NULL DEFAULT 'Sistema',
+                        ""Leida""           BOOLEAN      NOT NULL DEFAULT false,
+                        ""FechaCreacion""   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+                    );
+                ");
+                log.Add("✅ Tabla 'Notificacion' creada o ya existía.");
+
+                // Registrar en __EFMigrationsHistory para que EF no intente recrearla
+                await _context.Database.ExecuteSqlRawAsync(@"
+                    INSERT INTO ""__EFMigrationsHistory""(""MigrationId"", ""ProductVersion"")
+                    VALUES ('20260325235145_NotificacionesTable', '9.0.0')
+                    ON CONFLICT DO NOTHING;
+                ");
+                log.Add("✅ Migración 'NotificacionesTable' marcada en historial.");
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { error = ex.Message });
+                return StatusCode(500, new { step = "create-missing-tables", error = ex.Message, log });
             }
+            return Ok(new { message = "✅ Tablas faltantes creadas. Puedes llamar seed-notificaciones ahora.", log });
         }
 
         // ── FIX: Crear FK faltante Horarios → Asignatura ─────────────────────────
