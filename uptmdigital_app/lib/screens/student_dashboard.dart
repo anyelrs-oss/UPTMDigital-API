@@ -22,6 +22,7 @@ class StudentDashboard extends StatefulWidget {
 class _StudentDashboardState extends State<StudentDashboard> {
   int _currentIndex = 0;
   Map<String, dynamic>? _studentData;
+  Map<String, dynamic>? _estadoAcademico;
   bool _isLoading = true;
 
   @override
@@ -32,9 +33,11 @@ class _StudentDashboardState extends State<StudentDashboard> {
 
   Future<void> _loadStudentData() async {
     final data = await ApiService().getStudentMe();
+    final estado = await ApiService().getEstadoAcademico();
     if (mounted) {
       setState(() {
         _studentData = data;
+        _estadoAcademico = estado;
         _isLoading = false;
       });
     }
@@ -129,10 +132,15 @@ class _StudentDashboardState extends State<StudentDashboard> {
       
       floatingActionButton: FloatingActionButton(
         onPressed: () {
+          // Merge estado académico into userData for the menu
+          final menuData = {
+            ..._studentData!,
+            if (_estadoAcademico != null) 'estadoAcademico': _estadoAcademico,
+          };
           showModalBottomSheet(
             context: context,
-            backgroundColor: Colors.transparent, // Important so rounded corners show
-            builder: (context) => MenuBottomSheet(role: 'student', userData: _studentData),
+            backgroundColor: Colors.transparent,
+            builder: (context) => MenuBottomSheet(role: 'student', userData: menuData),
           );
         },
         shape: const CircleBorder(),
@@ -192,6 +200,72 @@ class _StudentDashboardState extends State<StudentDashboard> {
       padding: const EdgeInsets.all(16.0),
       children: [
 
+        // 0. Estado Académico Banner
+        if (_estadoAcademico != null && _estadoAcademico!['inscrito'] == false)
+          Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.orange.shade50,
+              border: Border.all(color: Colors.orange.shade300),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'No inscrito en el periodo actual',
+                        style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange.shade800),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Periodo: ${_estadoAcademico!['periodoActual'] ?? 'N/A'}. Contacta coordinación para inscribirte.',
+                        style: TextStyle(fontSize: 12, color: Colors.orange.shade700),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+        if (_estadoAcademico != null && _estadoAcademico!['arancelSolvente'] == false)
+          Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
+              border: Border.all(color: Colors.red.shade300),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.money_off_csred_rounded, color: Colors.red.shade700),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Arancel pendiente',
+                        style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red.shade800),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Tu carnet digital tiene funciones limitadas. Acércate a Secretaría.',
+                        style: TextStyle(fontSize: 12, color: Colors.red.shade700),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
 
         // 2. Academic Progress
         InstitutionalCard(

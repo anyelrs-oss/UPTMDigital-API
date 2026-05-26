@@ -223,6 +223,61 @@ namespace UPTMDigital.API.Controllers
             return Ok(inscripciones);
         }
 
+        /// <summary>
+        /// Estado académico consolidado: inscripción en periodo activo + estado de arancel.
+        /// El frontend usa esto para decidir si mostrar modo restringido o completo.
+        /// </summary>
+        [HttpGet("me/estado-academico")]
+        public async Task<IActionResult> GetMiEstadoAcademico()
+        {
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var userId)) return Unauthorized();
+
+            var estudiante = await _context.Estudiantes
+                .AsNoTracking()
+                .Include(e => e.Carrera)
+                .FirstOrDefaultAsync(e => e.UsuarioId == userId);
+
+            if (estudiante == null) return NotFound("Perfil de estudiante no vinculado.");
+
+            // Buscar el periodo activo
+            var periodoActivo = await _context.Periodos
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Activo);
+
+            // Verificar si tiene inscripciones en el periodo activo
+            var tieneInscripciones = false;
+            int totalInscripciones = 0;
+
+            if (periodoActivo != null)
+            {
+                totalInscripciones = await _context.Inscripciones
+                    .AsNoTracking()
+                    .CountAsync(i => i.EstudianteId == estudiante.IdEstudiante
+                                  && i.PeriodoId == periodoActivo.IdPeriodo);
+                tieneInscripciones = totalInscripciones > 0;
+            }
+            else
+            {
+                // Si no hay periodo activo configurado, contar inscripciones generales
+                totalInscripciones = await _context.Inscripciones
+                    .AsNoTracking()
+                    .CountAsync(i => i.EstudianteId == estudiante.IdEstudiante);
+                tieneInscripciones = totalInscripciones > 0;
+            }
+
+            return Ok(new
+            {
+                inscrito = tieneInscripciones,
+                totalInscripciones,
+                estadoArancel = estudiante.EstadoArancel,
+                arancelSolvente = estudiante.EstadoArancel == "Solvente",
+                carrera = estudiante.Carrera?.Nombre ?? "No asignada",
+                periodoActual = periodoActivo?.Nombre ?? "Sin periodo activo",
+                carnetHabilitado = tieneInscripciones && estudiante.EstadoArancel == "Solvente"
+            });
+        }
+
         private static bool IsTransientDbException(Exception ex)
         {
             if (ex is TimeoutException || ex is NpgsqlException)

@@ -170,9 +170,10 @@ namespace UPTMDigital.API.Controllers
             if (yaRegistrado)
                 return BadRequest(new { Message = "Esta cédula ya tiene una cuenta registrada." });
 
-            // 4. Determine Role ID (supports Estudiante, Profesor, Seguridad)
+            // 4. Determine Role ID (supports Estudiante, Profesor, Seguridad, Secretaria, Coordinador)
             var roleName = institutionalRecord.RolEsperado;
-            if (roleName != "Profesor" && roleName != "Seguridad")
+            var validRoles = new[] { "Profesor", "Seguridad", "Secretaria", "Coordinador" };
+            if (!validRoles.Contains(roleName))
                 roleName = "Estudiante"; // Default fallback
 
             var roleNode = await _context.Roles.FirstOrDefaultAsync(r => r.NombreRol == roleName);
@@ -193,7 +194,7 @@ namespace UPTMDigital.API.Controllers
             _context.Usuarios.Add(newUser);
             await _context.SaveChangesAsync();
 
-            // 6. Create Profile (Estudiante, Profesor, or none for Seguridad)
+            // 6. Create Profile based on Role
             if (roleName == "Estudiante")
             {
                 _context.Estudiantes.Add(new Estudiante
@@ -218,7 +219,20 @@ namespace UPTMDigital.API.Controllers
                     UsuarioId = newUser.IdUsuario
                 });
             }
-            // Seguridad: no profile needed, only Usuario with correct RolId
+            else if (roleName == "Coordinador")
+            {
+                // Buscar la carrera asociada al departamento del registro institucional
+                var carrera = await _context.Carreras
+                    .FirstOrDefaultAsync(c => c.Nombre == institutionalRecord.CarreraDepartamento);
+
+                _context.Coordinadores.Add(new Coordinador
+                {
+                    UsuarioId = newUser.IdUsuario,
+                    CarreraId = carrera?.IdCarrera ?? 0,
+                    Departamento = institutionalRecord.CarreraDepartamento
+                });
+            }
+            // Seguridad y Secretaria: no profile needed, only Usuario with correct RolId
 
             await _context.SaveChangesAsync();
 

@@ -28,6 +28,9 @@ namespace UPTMDigital.API.Data
         public DbSet<Semestre> Semestres { get; set; } = null!;
         public DbSet<Periodo> Periodos { get; set; } = null!;
         public DbSet<Notificacion> Notificaciones { get; set; } = null!;
+        public DbSet<Coordinador> Coordinadores { get; set; } = null!;
+        public DbSet<Aula> Aulas { get; set; } = null!;
+        public DbSet<SolicitudApertura> SolicitudesApertura { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -73,6 +76,36 @@ namespace UPTMDigital.API.Data
                 .HasOne(a => a.Usuario)
                 .WithMany()
                 .HasForeignKey(a => a.UsuarioId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // ===== Global Query Filters (Soft Delete) =====
+            // Filtra automáticamente registros con Activo = false en todas las consultas.
+            // Usar .IgnoreQueryFilters() en controllers admin cuando se necesite ver inactivos.
+            modelBuilder.Entity<Usuario>().HasQueryFilter(e => e.Activo);
+            modelBuilder.Entity<Estudiante>().HasQueryFilter(e => e.Activo);
+            modelBuilder.Entity<Profesor>().HasQueryFilter(e => e.Activo);
+            modelBuilder.Entity<Asignatura>().HasQueryFilter(e => e.Activo);
+            modelBuilder.Entity<Anuncio>().HasQueryFilter(e => e.Activo);
+            modelBuilder.Entity<Periodo>().HasQueryFilter(e => e.Activo);
+            modelBuilder.Entity<Nota>().HasQueryFilter(e => e.Activo);
+            modelBuilder.Entity<Inscripcion>().HasQueryFilter(e => e.Activo);
+            modelBuilder.Entity<Constancia>().HasQueryFilter(e => e.Activo);
+            modelBuilder.Entity<Horario>().HasQueryFilter(e => e.Activo);
+            modelBuilder.Entity<Carrera>().HasQueryFilter(e => e.Activo);
+            modelBuilder.Entity<Coordinador>().HasQueryFilter(e => e.Activo);
+            modelBuilder.Entity<Aula>().HasQueryFilter(e => e.Activo);
+
+            // SolicitudApertura: FK config (múltiples FK a distintas tablas)
+            modelBuilder.Entity<SolicitudApertura>()
+                .HasOne(s => s.Profesor)
+                .WithMany()
+                .HasForeignKey(s => s.ProfesorId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<SolicitudApertura>()
+                .HasOne(s => s.SeguridadUsuario)
+                .WithMany()
+                .HasForeignKey(s => s.SeguridadUsuarioId)
                 .OnDelete(DeleteBehavior.Restrict);
         }
     }

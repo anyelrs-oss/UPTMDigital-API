@@ -24,5 +24,7 @@ namespace UPTMDigital.API.Models
         // Relación con Asignatura (navigation property para Include en consultas)
         [ForeignKey("AsignaturaId")]
         public Asignatura? Asignatura { get; set; }
+
+        public bool Activo { get; set; } = true;
     }
 }

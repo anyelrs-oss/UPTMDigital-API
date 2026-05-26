@@ -18,5 +18,7 @@ namespace UPTMDigital.API.Models
         public Asignatura Asignatura { get; set; } = null!;
         public Estudiante Estudiante { get; set; } = null!;
         public Profesor? Profesor { get; set; }
+
+        public bool Activo { get; set; } = true;
     }
 }

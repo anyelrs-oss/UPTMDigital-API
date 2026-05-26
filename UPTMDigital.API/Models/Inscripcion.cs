@@ -24,5 +24,6 @@ namespace UPTMDigital.API.Models
 
         public DateTime? FechaInscripcion { get; set; }
         public string? Estado { get; set; }
+        public bool Activo { get; set; } = true;
     }
 }

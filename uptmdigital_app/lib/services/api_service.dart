@@ -461,6 +461,16 @@ class ApiService {
     }
   }
 
+  /// Estado académico consolidado: inscripción + arancel + carnet habilitado.
+  Future<Map<String, dynamic>?> getEstadoAcademico() async {
+    try {
+      final response = await _dio.get('/api/estudiantes/me/estado-academico');
+      return response.data;
+    } catch (e) {
+      return null;
+    }
+  }
+
   Future<List<Anuncio>> getAnuncios() async {
     try {
       final response = await _dio.get('/api/anuncios');

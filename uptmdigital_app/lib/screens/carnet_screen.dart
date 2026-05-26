@@ -5,8 +5,13 @@ import 'package:uptmdigital_app/theme.dart';
 
 class CarnetScreen extends StatelessWidget {
   final Map<String, dynamic> studentData;
+  final bool carnetHabilitado;
 
-  const CarnetScreen({Key? key, required this.studentData}) : super(key: key);
+  const CarnetScreen({
+    Key? key,
+    required this.studentData,
+    this.carnetHabilitado = true,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -116,6 +121,20 @@ class CarnetScreen extends StatelessWidget {
                             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
                           ),
                         ),
+                        const SizedBox(height: 8),
+                        // Badge de estado
+                        if (!carnetHabilitado)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade600,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Text(
+                              'PERIODO INACTIVO',
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11, letterSpacing: 1),
+                            ),
+                          ),
                         
                         const Spacer(),
                         
@@ -142,6 +161,25 @@ class CarnetScreen extends StatelessWidget {
                     ),
                   ],
                 ),
+                // Marca de agua si arancel pendiente
+                // TODO: Agregar FLAG_SECURE en Android (WindowManager.LayoutParams.FLAG_SECURE) para bloquear capturas
+                if (!carnetHabilitado)
+                  Positioned.fill(
+                    child: Center(
+                      child: Transform.rotate(
+                        angle: -0.5,
+                        child: Text(
+                          'PENDIENTE POR ARANCEL',
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white.withOpacity(0.15),
+                            letterSpacing: 4,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
               ),
               const SizedBox(height: 20),
               const Text(

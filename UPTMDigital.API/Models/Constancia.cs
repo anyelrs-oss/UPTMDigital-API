@@ -16,5 +16,7 @@ namespace UPTMDigital.API.Models
         public string? ArchivoUrl { get; set; }
 
         public Estudiante Estudiante { get; set; } = null!;
+
+        public bool Activo { get; set; } = true;
     }
 }

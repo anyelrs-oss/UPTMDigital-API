@@ -139,8 +139,13 @@ class MenuBottomSheet extends StatelessWidget {
             'title': 'ACADÉMICO',
             'items': [
               {'icon': Icons.badge, 'label': 'Carnet', 'onTap': () {
-                 if (hasData) nav(CarnetScreen(studentData: userData!));
-                 else notImpl();
+                 if (hasData) {
+                   final estado = userData!['estadoAcademico'];
+                   final habilitado = estado?['carnetHabilitado'] ?? true;
+                   nav(CarnetScreen(studentData: userData!, carnetHabilitado: habilitado));
+                 } else {
+                   notImpl();
+                 }
               }},
               {'icon': Icons.description, 'label': 'Constancias', 'onTap': () {
                  if (hasData) nav(ConstanciasScreen(studentId: userData!['idEstudiante']));

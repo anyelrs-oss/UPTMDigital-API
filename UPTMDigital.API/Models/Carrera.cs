@@ -9,5 +9,6 @@ namespace UPTMDigital.API.Models
         [Key]
         public int IdCarrera { get; set; }
         public string Nombre { get; set; } = null!;
+        public bool Activo { get; set; } = true;
     }
 }

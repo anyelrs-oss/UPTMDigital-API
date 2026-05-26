@@ -30,6 +30,10 @@ namespace UPTMDigital.API.Models
         public string CarreraNombre => Carrera?.Nombre ?? "";
 
         public DateTime? FechaRegistro { get; set; }
+
+        /// <summary>Estado del arancel: "Solvente" o "Pendiente". Controla acceso al carnet y constancias.</summary>
+        public string EstadoArancel { get; set; } = "Pendiente";
+
         public bool Activo { get; set; } = true;
     }
 }
