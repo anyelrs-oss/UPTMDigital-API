@@ -25,7 +25,9 @@ namespace UPTMDigital.API.Controllers
         public async Task<ActionResult<IEnumerable<Estudiante>>> GetEstudiantes(
             [FromQuery] string? search,
             [FromQuery] string? carrera,
-            [FromQuery] bool? activo)
+            [FromQuery] bool? activo,
+            [FromQuery] int page = 1,
+            [FromQuery] int limit = 50)
         {
             var query = _context.Estudiantes.AsQueryable();
 
@@ -37,17 +39,30 @@ namespace UPTMDigital.API.Controllers
 
             if (!string.IsNullOrEmpty(search))
             {
-                var s = search.ToLower();
+                // Use EF.Functions.ILike for case-insensitive search (more efficient with indexes)
+                var pattern = $"%{search}%";
                 query = query.Where(e =>
-                    e.Nombres.ToLower().Contains(s) ||
-                    e.Apellidos.ToLower().Contains(s) ||
-                    e.Cedula.ToLower().Contains(s));
+                    EF.Functions.ILike(e.Nombres, pattern) ||
+                    EF.Functions.ILike(e.Apellidos, pattern) ||
+                    EF.Functions.ILike(e.Cedula, pattern));
             }
 
             if (!string.IsNullOrEmpty(carrera))
                 query = query.Where(e => e.Carrera != null && e.Carrera.Nombre.ToLower().Contains(carrera.ToLower()));
 
-            return await query.OrderBy(e => e.Apellidos).ToListAsync();
+            // Paginación segura
+            if (limit > 100) limit = 100;
+            if (page < 1) page = 1;
+            var skip = (page - 1) * limit;
+
+            var total = await query.CountAsync();
+            var items = await query.OrderBy(e => e.Apellidos)
+                .Skip(skip)
+                .Take(limit)
+                .ToListAsync();
+
+            Response.Headers.Add("X-Total-Count", total.ToString());
+            return items;
         }
 
         // GET: api/estudiantes/me

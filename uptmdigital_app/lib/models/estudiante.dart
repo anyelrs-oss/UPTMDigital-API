@@ -7,6 +7,8 @@ class Estudiante {
   final int? usuarioId;
   final int? carreraId;
   final String carreraNombre;
+  final String? telefono;
+  final String? profileImageUrl;
 
   Estudiante({
     required this.idEstudiante,
@@ -17,6 +19,8 @@ class Estudiante {
     this.usuarioId,
     this.carreraId,
     this.carreraNombre = '',
+    this.telefono,
+    this.profileImageUrl,
   });
 
   factory Estudiante.fromJson(Map<String, dynamic> json) {
@@ -37,6 +41,8 @@ class Estudiante {
       usuarioId: json['usuarioId'],
       carreraId: json['carreraId'],
       carreraNombre: carrera,
+      telefono: json['telefono'],
+      profileImageUrl: json['profileImageUrl'],
     );
   }
 }

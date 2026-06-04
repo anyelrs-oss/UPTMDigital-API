@@ -29,7 +29,7 @@ class SearchFilterBar extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 10,
                 offset: const Offset(0, 2),
               ),
@@ -61,7 +61,7 @@ class SearchFilterBar extends StatelessWidget {
                   label: Text(filter.label),
                   selected: filter.isSelected,
                   onSelected: filter.onSelected,
-                  selectedColor: AppTheme.secondary.withOpacity(0.2),
+                  selectedColor: AppTheme.secondary.withValues(alpha: 0.2),
                   checkmarkColor: AppTheme.primary,
                   labelStyle: TextStyle(
                     color: filter.isSelected ? AppTheme.primary : Colors.grey[700],

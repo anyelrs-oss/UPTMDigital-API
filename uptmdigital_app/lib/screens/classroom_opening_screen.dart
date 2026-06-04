@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:uptmdigital_app/services/api_service.dart';
-import 'package:uptmdigital_app/theme.dart';
+import 'package:uptmdigital_app/widgets/institutional_card.dart';
+import 'dart:async';
 
 class ClassroomOpeningScreen extends StatefulWidget {
   const ClassroomOpeningScreen({super.key});
@@ -11,134 +11,146 @@ class ClassroomOpeningScreen extends StatefulWidget {
 }
 
 class _ClassroomOpeningScreenState extends State<ClassroomOpeningScreen> {
-  bool _isProcessing = false;
-  
-  // Mock rooms for now, ideally fetched from backend
-  final List<String> _rooms = ["Aula 1", "Aula 2", "Aula 3", "Lab 1", "Lab 2", "Auditorio"];
-  String? _selectedRoom;
+  List<dynamic> _aulas = [];
+  bool _isLoadingAulas = true;
+  dynamic _solicitudActiva;
+  Timer? _pollingTimer;
 
-  void _onDetect(BarcodeCapture capture) async {
-    if (_isProcessing) return;
-    
-    final List<Barcode> barcodes = capture.barcodes;
-    if (barcodes.isEmpty) return;
-
-    final code = barcodes.first.rawValue;
-    if (code == null) return;
-
-    setState(() => _isProcessing = true);
-
-    // Assume QR code contains Professor ID or Cedula.
-    // We'll simulate fetching professor info based on this ID.
-    // For prototype, we show a dialog to select the room.
-    
-    _showRoomSelectionDialog(code);
+  @override
+  void initState() {
+    super.initState();
+    _loadAulas();
+    _checkActiveRequest();
+    _startPolling();
   }
 
-  void _showRoomSelectionDialog(String professorIdOrCedula) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setState) {
-          return AlertDialog(
-            title: const Text("Seleccionar Aula"),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text("Código Profesor Detectado"),
-                Text(professorIdOrCedula, style: const TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 20),
-                DropdownButtonFormField<String>(
-                  decoration: const InputDecoration(labelText: "Aula a abrir"),
-                  items: _rooms.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
-                  onChanged: (val) {
-                    setState(() => _selectedRoom = val);
-                  },
-                  value: _selectedRoom,
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  _resetScan();
-                },
-                child: const Text("Cancelar"),
-              ),
-              ElevatedButton(
-                onPressed: _selectedRoom == null ? null : () {
-                  Navigator.pop(ctx);
-                  _processOpening(professorIdOrCedula, _selectedRoom!);
-                },
-                child: const Text("Confirmar Apertura"),
-              ),
-            ],
-          );
-        }
-      ),
-    );
+  @override
+  void dispose() {
+    _pollingTimer?.cancel();
+    super.dispose();
   }
 
-  void _processOpening(String professorId, String room) async {
-    // Call API to log opening
-    // For now, mock it or call a new method in ApiService
-    final success = await ApiService().registrarAperturaAula(professorId, room);
-    
-    if (!mounted) return;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(success ? "Éxito" : "Error"),
-        content: Text(success ? "Aula $room abierta por profesor." : "Error al registrar apertura."),
-        actions: [
-          TextButton(
-            onPressed: () {
-               Navigator.pop(ctx);
-               _resetScan();
-            },
-            child: const Text("OK"),
-          )
-        ],
-      ),
-    );
-  }
-
-  void _resetScan() {
-    setState(() {
-      _isProcessing = false;
-      _selectedRoom = null;
+  void _startPolling() {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
+      if (_solicitudActiva != null && _solicitudActiva['estado'] != 'Completada') {
+        _checkActiveRequest();
+      }
     });
+  }
+
+  Future<void> _loadAulas() async {
+    final data = await ApiService().getAulas();
+    if (mounted) {
+      setState(() {
+        _aulas = data;
+        _isLoadingAulas = false;
+      });
+    }
+  }
+
+  Future<void> _checkActiveRequest() async {
+    // Buscamos si el profesor ya tiene una solicitud pendiente o en camino
+    // getSolicitudesApertura() devuelve todas, para simplificar buscamos la más reciente
+    final data = await ApiService().getSolicitudesApertura();
+    if (mounted && data.isNotEmpty) {
+      // Nota: En producción esto debería filtrar por ProfesorId en el servidor
+      // Aquí tomamos la primera que esté abierta como ejemplo
+      final active = data.firstWhere(
+        (s) => s['estado'] == 'Pendiente' || s['estado'] == 'EnCamino' || s['estado'] == 'Completada',
+        orElse: () => null,
+      );
+
+      // Si la completada es vieja, no la mostramos como activa
+      if (active != null && active['estado'] == 'Completada') {
+        final fecha = DateTime.parse(active['fechaCompletada']);
+        if (DateTime.now().difference(fecha).inMinutes > 5) {
+          setState(() => _solicitudActiva = null);
+          return;
+        }
+      }
+
+      setState(() => _solicitudActiva = active);
+    }
+  }
+
+  void _solicitar(int aulaId) async {
+    final res = await ApiService().solicitarApertura(aulaId, "Apertura de clase");
+    if (res != null) {
+      setState(() => _solicitudActiva = res);
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Solicitud enviada")));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Apertura de Aulas")),
-      body: Stack(
-        children: [
-          MobileScanner(onDetect: _onDetect),
-          if (_isProcessing)
-            Container(color: Colors.black54, child: const Center(child: CircularProgressIndicator())),
-          Positioned(
-            bottom: 40,
-            left: 20,
-            right: 20,
-            child: Card(
-              color: Colors.white.withOpacity(0.9),
-              child: const Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Text(
-                  "Escanee el QR del Profesor para autorizar la apertura.",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontWeight: FontWeight.bold),
+      appBar: AppBar(title: const Text("Solicitar Apertura")),
+      body: _isLoadingAulas
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              children: [
+                if (_solicitudActiva != null) _buildStatusBanner(),
+                Expanded(
+                  child: ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _aulas.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemBuilder: (_, i) => _buildAulaItem(_aulas[i]),
+                  ),
                 ),
-              ),
+              ],
             ),
-          ),
+    );
+  }
+
+  Widget _buildStatusBanner() {
+    final String estado = _solicitudActiva['estado'];
+    Color color = Colors.orange;
+    String texto = "Pendiente — Esperando respuesta de seguridad";
+    IconData icon = Icons.timer_outlined;
+
+    if (estado == 'EnCamino') {
+      color = Colors.blue;
+      texto = "En camino — Un oficial va hacia el aula";
+      icon = Icons.directions_run;
+    } else if (estado == 'Completada') {
+      color = Colors.green;
+      texto = "Completada — El aula ha sido abierta";
+      icon = Icons.check_circle_outline;
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      color: color.withValues(alpha: 0.1),
+      child: Row(
+        children: [
+          Icon(icon, color: color),
+          const SizedBox(width: 12),
+          Expanded(child: Text(texto, style: TextStyle(color: color, fontWeight: FontWeight.bold))),
+          if (estado == 'Completada')
+            IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => setState(() => _solicitudActiva = null),
+            )
         ],
+      ),
+    );
+  }
+
+  Widget _buildAulaItem(dynamic a) {
+    final bool isOcupada = a['estado'] == 'Ocupada';
+    return InstitutionalCard(
+      margin: EdgeInsets.zero,
+      child: ListTile(
+        title: Text(a['nombre'], style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text("${a['edificio']} — Piso ${a['piso']}"),
+        trailing: isOcupada
+            ? const Chip(label: Text("Ocupada"), backgroundColor: Colors.redAccent, labelStyle: TextStyle(color: Colors.white, fontSize: 10))
+            : ElevatedButton(
+                onPressed: _solicitudActiva != null ? null : () => _solicitar(a['idAula']),
+                child: const Text("Solicitar"),
+              ),
       ),
     );
   }

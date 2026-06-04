@@ -81,7 +81,8 @@ namespace UPTMDigital.API.Controllers
                 Token = token,
                 Expiracion = DateTime.UtcNow.AddDays(30),
                 NombreUsuario = usuario.NombreUsuario,
-                Rol = roleName
+                Rol = roleName,
+                IdUsuario = usuario.IdUsuario
             });
         }
 
@@ -166,13 +167,17 @@ namespace UPTMDigital.API.Controllers
             if (institutionalRecord == null)
                 return BadRequest(new { Message = "Cédula no encontrada en el registro institucional de la UPTM." });
 
+            // Filtro SuperAdmin (No permitir registro directo de SuperAdmin)
+            if (institutionalRecord.RolEsperado == "SuperAdmin")
+                return BadRequest(new { Message = "Este rol no permite auto-registro." });
+
             var yaRegistrado = await _context.Usuarios.AnyAsync(u => u.Cedula == register.Cedula);
             if (yaRegistrado)
                 return BadRequest(new { Message = "Esta cédula ya tiene una cuenta registrada." });
 
-            // 4. Determine Role ID (supports Estudiante, Profesor, Seguridad)
+            // 4. Determine Role ID (supports Estudiante, Profesor, Seguridad, Coordinador)
             var roleName = institutionalRecord.RolEsperado;
-            if (roleName != "Profesor" && roleName != "Seguridad")
+            if (roleName != "Profesor" && roleName != "Seguridad" && roleName != "Coordinador" && roleName != "Secretaria")
                 roleName = "Estudiante"; // Default fallback
 
             var roleNode = await _context.Roles.FirstOrDefaultAsync(r => r.NombreRol == roleName);
@@ -218,7 +223,20 @@ namespace UPTMDigital.API.Controllers
                     UsuarioId = newUser.IdUsuario
                 });
             }
-            // Seguridad: no profile needed, only Usuario with correct RolId
+            else if (roleName == "Coordinador")
+            {
+                // Link based on Career Name from Registry
+                var carrera = await _context.Carreras.FirstOrDefaultAsync(c => c.Nombre == institutionalRecord.CarreraDepartamento);
+
+                _context.Coordinadores.Add(new Coordinador
+                {
+                    Nombres = institutionalRecord.Nombres,
+                    Apellidos = institutionalRecord.Apellidos,
+                    UsuarioId = newUser.IdUsuario,
+                    CarreraId = carrera?.IdCarrera
+                });
+            }
+            // Seguridad/Secretaria: no extra profile needed for now
 
             await _context.SaveChangesAsync();
 

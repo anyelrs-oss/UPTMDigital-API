@@ -5,13 +5,16 @@ import 'package:uptmdigital_app/screens/login_screen.dart';
 import 'package:uptmdigital_app/screens/estudiantes_screen.dart';
 import 'package:uptmdigital_app/screens/profesores_screen.dart';
 import 'package:uptmdigital_app/screens/asignaturas_screen.dart';
-import 'package:uptmdigital_app/screens/inscripciones_screen.dart';
-import 'package:uptmdigital_app/screens/notas_screen.dart';
-import 'package:uptmdigital_app/screens/asistencias_screen.dart';
+import 'package:uptmdigital_app/screens/asistencias_main_screen.dart';
+import 'package:uptmdigital_app/screens/academic_hierarchy_screen.dart';
 import 'package:uptmdigital_app/screens/constancias_screen.dart';
 import 'package:uptmdigital_app/screens/admin_maintenance_screen.dart';
-import 'package:uptmdigital_app/screens/horarios_screen.dart';
 import 'package:uptmdigital_app/screens/usuarios_screen.dart';
+import 'package:uptmdigital_app/screens/personal_screen.dart';
+import 'package:uptmdigital_app/screens/anuncios_admin_screen.dart';
+import 'package:uptmdigital_app/screens/aranceles_admin_screen.dart';
+import 'package:uptmdigital_app/screens/auditoria_main_screen.dart';
+import 'package:uptmdigital_app/screens/pines_docentes_screen.dart';
 import 'package:uptmdigital_app/widgets/institutional_card.dart';
 
 class AdminDashboard extends StatelessWidget {
@@ -28,17 +31,11 @@ class AdminDashboard extends StatelessWidget {
             const Text("Panel de Administrador"),
           ],
         ),
+        automaticallyImplyLeading: false,
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await ApiService().logout();
-              if (context.mounted) {
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                );
-              }
-            },
+            onPressed: () => _confirmLogout(context),
           ),
         ],
       ),
@@ -51,16 +48,22 @@ class AdminDashboard extends StatelessWidget {
           GridView.count(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 3,
+            crossAxisCount: 2, // Cambiado a 2 para que queden parejos
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
-            childAspectRatio: 0.95,
+            childAspectRatio: 1.6,
             children: [
               _AdminCard(
                 icon: Icons.manage_accounts,
                 title: "Usuarios",
                 color: Colors.purple,
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const UsuariosScreen())),
+              ),
+              _AdminCard(
+                icon: Icons.badge,
+                title: "Personal",
+                color: Colors.blueGrey,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PersonalScreen())),
               ),
               _AdminCard(
                 icon: Icons.people_outline,
@@ -90,42 +93,44 @@ class AdminDashboard extends StatelessWidget {
             childAspectRatio: 0.95,
             children: [
               _AdminCard(
+                icon: Icons.pin_outlined,
+                title: "Pines de Docentes",
+                color: Colors.red,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PinesDocentesScreen())),
+              ),
+              _AdminCard(
                 icon: Icons.book_outlined,
                 title: "Asignaturas",
                 color: AppTheme.secondary,
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AsignaturasScreen())),
               ),
               _AdminCard(
-                icon: Icons.app_registration,
-                title: "Inscripciones",
-                color: AppTheme.secondary,
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InscripcionesScreen())),
-              ),
-              _AdminCard(
                 icon: Icons.grade,
                 title: "Notas",
                 color: AppTheme.secondary,
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotasScreen())),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AcademicHierarchyScreen(target: AcademicTarget.notas))),
               ),
               _AdminCard(
                 icon: Icons.check_circle_outline,
                 title: "Asistencias",
                 color: AppTheme.secondary,
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AsistenciasScreen())),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AsistenciasMainScreen())),
               ),
               _AdminCard(
                 icon: Icons.access_time,
                 title: "Horarios",
                 color: AppTheme.secondary,
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HorariosScreen(isAdmin: true))),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AcademicHierarchyScreen(target: AcademicTarget.horarios))),
               ),
             ],
           ),
           const SizedBox(height: 20),
 
           // --- SERVICIOS ---
-          _SectionHeader(icon: Icons.miscellaneous_services, title: "Servicios"),
+          _SectionHeader(icon: Icons.settings, title: "Servicios y Reportes"),
           const SizedBox(height: 8),
+          _buildGradeUploadControl(context),
+          const SizedBox(height: 12),
           GridView.count(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -141,14 +146,78 @@ class AdminDashboard extends StatelessWidget {
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ConstanciasScreen())),
               ),
               _AdminCard(
-                icon: Icons.settings,
-                title: "Mantenimiento",
-                color: Colors.grey,
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminMaintenanceScreen())),
+                icon: Icons.point_of_sale_outlined,
+                title: "Secretaría",
+                color: Colors.blueGrey,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ArancelesAdminScreen())),
+              ),
+              _AdminCard(
+                icon: Icons.campaign_outlined,
+                title: "Anuncios",
+                color: Colors.orange,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AnunciosAdminScreen())),
+              ),
+              _AdminCard(
+                icon: Icons.history_edu_outlined,
+                title: "Centro de Auditoría",
+                color: Colors.black,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AuditoriaMainScreen())),
               ),
             ],
           ),
           const SizedBox(height: 40),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGradeUploadControl(BuildContext context) {
+    return StatefulBuilder(
+      builder: (context, setState) {
+        return FutureBuilder<String?>(
+          future: ApiService().getGlobalSetting("HabilitarSubidaNotas"),
+          builder: (context, snapshot) {
+            final bool isEnabled = snapshot.data == "true";
+            return InstitutionalCard(
+              margin: EdgeInsets.zero,
+              child: SwitchListTile(
+                title: const Text("Semana de Subida de Notas", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                subtitle: Text(isEnabled ? "Activado — Los profesores pueden subir notas" : "Desactivado — Solo carga local permitida", style: const TextStyle(fontSize: 11)),
+                value: isEnabled,
+                onChanged: (val) async {
+                  final success = await ApiService().setGlobalSetting("HabilitarSubidaNotas", val.toString());
+                  if (success) setState(() {});
+                },
+                activeColor: Colors.green,
+              ),
+            );
+          },
+        );
+      }
+    );
+  }
+
+  void _confirmLogout(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Cerrar Sesión"),
+        content: const Text("¿Estás seguro de que deseas salir de tu cuenta?"),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancelar")),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await ApiService().logout();
+              if (context.mounted) {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text("Cerrar Sesión"),
+          ),
         ],
       ),
     );
@@ -208,7 +277,7 @@ class _AdminCard extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 24,
-                backgroundColor: color.withOpacity(0.1),
+                backgroundColor: color.withValues(alpha: 0.1),
                 child: Icon(icon, size: 24, color: color),
               ),
               const SizedBox(height: 10),

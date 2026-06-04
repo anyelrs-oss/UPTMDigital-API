@@ -1,8 +1,9 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:uptmdigital_app/models/anuncio.dart';
 import 'package:uptmdigital_app/models/mensaje.dart';
+import 'dart:convert';
 
 class ApiService {
   static final ApiService instance = ApiService._();
@@ -13,6 +14,11 @@ class ApiService {
   final storage = const FlutterSecureStorage(
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
   );
+
+  // In-memory cache with TTL (Time To Live)
+  final Map<String, _CacheEntry> _memoryCache = {};
+  static const Duration _defaultCacheTTL = Duration(minutes: 10);
+  static const Duration _listCacheTTL = Duration(minutes: 5);
 
   // Prioridad 1: URL explícita en build/deploy (recomendado para operación remota).
   static const String _apiBaseUrl = String.fromEnvironment(
@@ -54,10 +60,30 @@ class ApiService {
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
           }
+
+          // Adjuntar motivo de borrado si existe en el almacenamiento temporal
+          String? reason = await storage.read(key: 'pending_delete_reason');
+          if (reason != null) {
+            options.headers['X-Reason'] = reason;
+            await storage.delete(key: 'pending_delete_reason'); // Limpiar después de usar
+          }
+
           handler.next(options);
         },
       ),
     );
+
+    // Wake up server in background
+    getHealth();
+  }
+
+  Future<bool> getHealth() async {
+    try {
+      final response = await _dio.get('/health');
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
   }
 
   Future<Map<String, dynamic>> login(String username, String password) async {
@@ -90,7 +116,7 @@ class ApiService {
       }
       return {'success': false, 'message': 'Falla de conexión con el servidor'};
     } catch (e) {
-      print('Login error: $e');
+      debugPrint('Login error: $e');
       return {'success': false, 'message': 'Error inesperado'};
     }
   }
@@ -150,13 +176,37 @@ class ApiService {
     }
   }
 
-  Future<List<dynamic>> getEstudiantes() async {
-    try {
-      final response = await _dio.get('/api/estudiantes');
-      return response.data;
-    } catch (e) {
-      return [];
+  Future<List<dynamic>> getEstudiantes({String? search, String? carrera, int page = 1, int limit = 20}) async {
+    // Don't cache filtered/search results, only page 1
+    final cacheKey = 'cache_estudiantes_p${page}';
+    
+    if (page == 1 && search == null && carrera == null) {
+      final cached = await _getCached<List>(cacheKey);
+      if (cached != null) return cached;
     }
+
+    try {
+      final params = {
+        'page': page,
+        'limit': limit,
+        if (search != null) 'search': search,
+        if (carrera != null) 'carrera': carrera,
+      };
+      final response = await _dio.get('/api/estudiantes', queryParameters: params);
+
+      if (response.statusCode == 200) {
+        if (page == 1 && search == null && carrera == null) {
+          await _setCached(cacheKey, response.data, ttl: _listCacheTTL);
+        }
+        return response.data;
+      }
+    } catch (e) {
+      if (page == 1 && search == null && carrera == null) {
+        final cached = await _getCached<List>(cacheKey);
+        if (cached != null) return cached;
+      }
+    }
+    return [];
   }
 
   Future<bool> createStudent(Map<String, dynamic> studentData) async {
@@ -188,13 +238,35 @@ class ApiService {
 
   // --- PROFESORES ---
 
-  Future<List<dynamic>> getProfesores() async {
-    try {
-      final response = await _dio.get('/api/profesores');
-      return response.data;
-    } catch (e) {
-      return [];
+  Future<List<dynamic>> getProfesores({String? search, String? departamento, int page = 1, int limit = 20}) async {
+    final cacheKey = 'cache_profesores_p${page}';
+    
+    if (page == 1 && search == null && departamento == null) {
+      final cached = await _getCached<List>(cacheKey);
+      if (cached != null) return cached;
     }
+
+    try {
+      final params = {
+        'page': page,
+        'limit': limit,
+        if (search != null) 'search': search,
+        if (departamento != null) 'departamento': departamento,
+      };
+      final response = await _dio.get('/api/profesores', queryParameters: params);
+      if (response.statusCode == 200) {
+        if (page == 1 && search == null && departamento == null) {
+          await _setCached(cacheKey, response.data, ttl: _listCacheTTL);
+        }
+        return response.data;
+      }
+    } catch (e) {
+      if (page == 1 && search == null && departamento == null) {
+        final cached = await _getCached<List>(cacheKey);
+        if (cached != null) return cached;
+      }
+    }
+    return [];
   }
 
   Future<bool> createProfesor(Map<String, dynamic> data) async {
@@ -227,12 +299,24 @@ class ApiService {
   // --- ASIGNATURAS ---
 
   Future<List<dynamic>> getAsignaturas() async {
+    const cacheKey = 'cache_asignaturas';
+    
+    final cached = await _getCached<List>(cacheKey);
+    if (cached != null) return cached;
+
     try {
       final response = await _dio.get('/api/asignaturas');
-      return response.data;
+      if (response.statusCode == 200) {
+        await _setCached(cacheKey, response.data, ttl: _defaultCacheTTL);
+        return response.data;
+      }
     } catch (e) {
-      return [];
+      debugPrint('Error fetching asignaturas: $e');
+      // Try to return cached data even if expired
+      final fallback = await _getCached<List>(cacheKey);
+      if (fallback != null) return fallback;
     }
+    return [];
   }
 
   Future<bool> createAsignatura(Map<String, dynamic> data) async {
@@ -302,10 +386,14 @@ class ApiService {
 
   // --- NOTAS ---
 
-  Future<List<dynamic>> getNotas() async {
+  Future<List<dynamic>> getNotas({String? search, int? asignaturaId}) async {
     try {
-      final response = await _dio.get('/api/notas');
-      return response.data;
+      final params = <String, dynamic>{};
+      if (search != null) params['search'] = search;
+      if (asignaturaId != null) params['asignaturaId'] = asignaturaId.toString();
+
+      final response = await _dio.get('/api/notas', queryParameters: params);
+      return response.data as List;
     } catch (e) {
       return [];
     }
@@ -446,17 +534,60 @@ class ApiService {
   Future<Map<String, dynamic>?> getProfessorMe() async {
     try {
       final response = await _dio.get('/api/profesores/me');
-      return response.data;
+      if (response.statusCode == 200) {
+        await storage.write(key: 'cached_professor_data', value: jsonEncode(response.data));
+        return response.data;
+      }
     } catch (e) {
-      return null;
+      final cached = await storage.read(key: 'cached_professor_data');
+      if (cached != null) return jsonDecode(cached);
     }
+    return null;
+  }
+
+  Future<List<dynamic>> getStudentGradesMe() async {
+    try {
+      final response = await _dio.get('/api/estudiantes/me/notas');
+      if (response.statusCode == 200) {
+        await storage.write(key: 'cached_my_grades', value: jsonEncode(response.data));
+        return response.data;
+      }
+    } catch (e) {
+      final cached = await storage.read(key: 'cached_my_grades');
+      if (cached != null) return jsonDecode(cached);
+    }
+    return [];
+  }
+
+  Future<List<dynamic>> getStudentInscripcionesMe() async {
+    try {
+      final response = await _dio.get('/api/estudiantes/me/inscripciones');
+      if (response.statusCode == 200) {
+        await storage.write(key: 'cached_my_inscripciones', value: jsonEncode(response.data));
+        return response.data;
+      }
+    } catch (e) {
+      final cached = await storage.read(key: 'cached_my_inscripciones');
+      if (cached != null) return jsonDecode(cached);
+    }
+    return [];
   }
 
   Future<Map<String, dynamic>?> getStudentMe() async {
     try {
       final response = await _dio.get('/api/estudiantes/me');
-      return response.data;
+      if (response.statusCode == 200) {
+        // Guardamos en caché local para carga instantánea la próxima vez
+        await storage.write(key: 'cached_student_data', value: jsonEncode(response.data));
+        return response.data;
+      }
+      return null;
     } catch (e) {
+      // Si falla la red, intentamos devolver lo que tenemos en caché
+      final cached = await storage.read(key: 'cached_student_data');
+      if (cached != null) {
+        return jsonDecode(cached);
+      }
       return null;
     }
   }
@@ -465,10 +596,17 @@ class ApiService {
     try {
       final response = await _dio.get('/api/anuncios');
       if (response.statusCode == 200) {
-        return (response.data as List).map((e) => Anuncio.fromJson(e)).toList();
+        final List data = response.data;
+        await storage.write(key: 'cached_anuncios', value: jsonEncode(data));
+        return data.map((e) => Anuncio.fromJson(e)).toList();
       }
     } catch (e) {
-      print("Error fetching anuncios: $e");
+      debugPrint("Error fetching anuncios: $e");
+      final cached = await storage.read(key: 'cached_anuncios');
+      if (cached != null) {
+        final List data = jsonDecode(cached);
+        return data.map((e) => Anuncio.fromJson(e)).toList();
+      }
     }
     return [];
   }
@@ -477,18 +615,101 @@ class ApiService {
     try {
       final response = await _dio.get('/api/mensajes/$asignaturaId');
       if (response.statusCode == 200) {
-        return (response.data as List).map((e) => Mensaje.fromJson(e)).toList();
+        final List data = response.data;
+        await storage.write(key: 'cached_messages_$asignaturaId', value: jsonEncode(data));
+        return data.map((e) => Mensaje.fromJson(e)).toList();
       }
     } catch (e) {
-      print("Error fetching messages: $e");
+      final cached = await storage.read(key: 'cached_messages_$asignaturaId');
+      if (cached != null) {
+        final List data = jsonDecode(cached);
+        return data.map((e) => Mensaje.fromJson(e)).toList();
+      }
     }
     return [];
+  }
+
+  Future<List<Mensaje>> getMensajesPrivados(int peerUserId) async {
+    try {
+      final response = await _dio.get('/api/mensajes/privado/$peerUserId');
+      if (response.statusCode == 200) {
+        final List data = response.data;
+        await storage.write(key: 'cached_messages_priv_$peerUserId', value: jsonEncode(data));
+        return data.map((e) => Mensaje.fromJson(e)).toList();
+      }
+    } catch (e) {
+      final cached = await storage.read(key: 'cached_messages_priv_$peerUserId');
+      if (cached != null) {
+        final List data = jsonDecode(cached);
+        return data.map((e) => Mensaje.fromJson(e)).toList();
+      }
+    }
+    return [];
+  }
+
+  Future<List<Mensaje>> getMensajesCarrera(int carreraId) async {
+    try {
+      final response = await _dio.get('/api/mensajes/carrera/$carreraId');
+      if (response.statusCode == 200) {
+        final List data = response.data;
+        await storage.write(key: 'cached_messages_carrera_$carreraId', value: jsonEncode(data));
+        return data.map((e) => Mensaje.fromJson(e)).toList();
+      }
+    } catch (e) {
+      final cached = await storage.read(key: 'cached_messages_carrera_$carreraId');
+      if (cached != null) {
+        final List data = jsonDecode(cached);
+        return data.map((e) => Mensaje.fromJson(e)).toList();
+      }
+    }
+    return [];
+  }
+
+  Future<List<dynamic>> getMisChats() async {
+    try {
+      final response = await _dio.get('/api/mensajes/mis-chats');
+      return response.statusCode == 200 ? response.data as List : [];
+    } catch (e) {
+      return [];
+    }
   }
 
   Future<bool> sendMensaje(Map<String, dynamic> data) async {
     try {
       await _dio.post('/api/mensajes', data: data);
       return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>> generarPinAsistencia(int? carreraId) async {
+    try {
+      final response = await _dio.post('/api/coordinadores/generar-pin', data: {'carreraId': carreraId});
+      return response.statusCode == 200 ? response.data : {'pin': null};
+    } catch (e) {
+      return {'pin': null};
+    }
+  }
+
+  Future<Map<String, dynamic>?> getCoordinadorMe() async {
+    try {
+      final response = await _dio.get('/api/coordinadores/me');
+      if (response.statusCode == 200) {
+        await storage.write(key: 'cached_coord_data', value: jsonEncode(response.data));
+        return response.data;
+      }
+    } catch (e) {
+      final cached = await storage.read(key: 'cached_coord_data');
+      if (cached != null) return jsonDecode(cached);
+    }
+    return null;
+  }
+
+  Future<bool> validarPinDocente(String pin) async {
+    try {
+      final response = await _dio.post('/api/asistencias/validar-pin', data: {'pin': pin});
+      return response.statusCode == 200;
     } catch (e) {
       return false;
     }
@@ -506,12 +727,85 @@ class ApiService {
     }
   }
 
+  // --- EVALUACIONES ---
+
+  Future<List<dynamic>> getEvaluaciones(int asignaturaId) async {
+    try {
+      final response = await _dio.get('/api/evaluaciones/asignatura/$asignaturaId');
+      return response.statusCode == 200 ? response.data as List : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<bool> createEvaluacion(Map<String, dynamic> data) async {
+    try {
+      await _dio.post('/api/evaluaciones', data: data);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // --- ARANCELES ---
+
+  Future<bool> validarArancel(String cedula, String factura) async {
+    try {
+      final response = await _dio.post('/api/aranceles/validar', data: {
+        'cedula': cedula,
+        'numeroFactura': factura,
+      });
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>?> getArancelStatus(String cedula) async {
+    try {
+      final response = await _dio.get('/api/aranceles/status/$cedula');
+      return response.statusCode == 200 ? response.data : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<List<dynamic>> getReporteAsistenciaDocente() async {
+    try {
+      final response = await _dio.get('/api/reportes/asistencia-docente');
+      return response.statusCode == 200 ? response.data as List : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
   // --- Admin Data ---
 
-  Future<List<dynamic>> getCarreras() async => _getBlock("carreras");
-  Future<List<dynamic>> getSemestres() async => _getBlock("semestres");
-  Future<List<dynamic>> getPeriodos() async => _getBlock("periodos");
+  Future<List<dynamic>> getCarreras() async => _getBlockCached("carreras");
+  Future<List<dynamic>> getSemestres() async => _getBlockCached("semestres");
+  Future<List<dynamic>> getPeriodos() async => _getBlockCached("periodos");
 
+  Future<List<dynamic>> _getBlockCached(String endpoint) async {
+    final cacheKey = 'cache_$endpoint';
+    
+    final cached = await _getCached<List>(cacheKey);
+    if (cached != null) return cached;
+
+    try {
+      final response = await _dio.get('/api/admindata/$endpoint');
+      if (response.statusCode == 200) {
+        await _setCached(cacheKey, response.data, ttl: _defaultCacheTTL);
+        return response.data as List;
+      }
+    } catch (e) {
+      debugPrint('Error fetching $endpoint: $e');
+      final fallback = await _getCached<List>(cacheKey);
+      if (fallback != null) return fallback;
+    }
+    return [];
+  }
+
+  @deprecated
   Future<List<dynamic>> _getBlock(String endpoint) async {
     try {
       final response = await _dio.get('/api/admindata/$endpoint');
@@ -582,7 +876,7 @@ class ApiService {
       );
       return response.statusCode == 200 ? response.data as List : [];
     } catch (e) {
-      print("Error fetching enrollments: $e");
+      debugPrint("Error fetching enrollments: $e");
       return [];
     }
   }
@@ -616,6 +910,15 @@ class ApiService {
     }
   }
 
+  Future<List<dynamic>> getHistorialAccesos() async {
+    try {
+      final response = await _dio.get('/api/controlacceso/historial');
+      return response.statusCode == 200 ? response.data as List : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
   Future<bool> registrarAperturaAula(String cedula, String aula) async {
     try {
       final response = await _dio.post(
@@ -624,25 +927,45 @@ class ApiService {
       );
       return response.statusCode == 200;
     } catch (e) {
-      print("Error opening classroom: $e");
+      debugPrint("Error opening classroom: $e");
       return false;
     }
   }
 
   // --- USUARIOS (Admin) ---
 
-  Future<List<dynamic>> getUsuarios({String? search, String? rol, bool? activo}) async {
+  Future<List<dynamic>> getUsuarios({String? search, String? rol, bool? activo, int page = 1, int limit = 20}) async {
+    final cacheKey = 'cache_usuarios_p${page}';
+    
+    if (page == 1 && search == null && rol == null && activo == null) {
+      final cached = await _getCached<List>(cacheKey);
+      if (cached != null) return cached;
+    }
+
     try {
-      final params = <String, dynamic>{};
+      final params = <String, dynamic>{
+        'page': page,
+        'limit': limit,
+      };
       if (search != null && search.isNotEmpty) params['search'] = search;
       if (rol != null) params['rol'] = rol;
       if (activo != null) params['activo'] = activo.toString();
 
       final response = await _dio.get('/api/usuarios', queryParameters: params);
-      return response.statusCode == 200 ? response.data as List : [];
+
+      if (response.statusCode == 200) {
+        if (page == 1 && search == null && rol == null && activo == null) {
+          await _setCached(cacheKey, response.data, ttl: _listCacheTTL);
+        }
+        return response.data as List;
+      }
     } catch (e) {
-      return [];
+      if (page == 1 && search == null && rol == null && activo == null) {
+        final cached = await _getCached<List>(cacheKey);
+        if (cached != null) return cached;
+      }
     }
+    return [];
   }
 
   Future<bool> updateUsuario(int id, Map<String, dynamic> data) async {
@@ -680,4 +1003,177 @@ class ApiService {
       return [];
     }
   }
+
+  Future<List<dynamic>> getAuditLogs() async {
+    try {
+      final response = await _dio.get('/api/audit');
+      return response.statusCode == 200 ? response.data as List : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<bool> createAnuncio(Map<String, dynamic> data) async {
+    try {
+      final response = await _dio.post('/api/anuncios', data: data);
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<List<dynamic>> getAulas({String? edificio, String? estado}) async {
+    try {
+      final params = <String, dynamic>{};
+      if (edificio != null) params['edificio'] = edificio;
+      if (estado != null) params['estado'] = estado;
+      final response = await _dio.get('/api/aulas', queryParameters: params);
+      return response.statusCode == 200 ? response.data as List : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<Map<String, dynamic>?> solicitarApertura(int aulaId, String? motivo) async {
+    try {
+      final response = await _dio.post('/api/aulas/solicitar-apertura', data: {
+        'aulaId': aulaId,
+        'motivo': motivo,
+      });
+      return response.statusCode == 200 ? response.data : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<List<dynamic>> getSolicitudesApertura({String? estado}) async {
+    try {
+      final params = <String, dynamic>{};
+      if (estado != null) params['estado'] = estado;
+      final response = await _dio.get('/api/aulas/solicitudes', queryParameters: params);
+      return response.statusCode == 200 ? response.data as List : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<bool> marcarEnCamino(int solicitudId) async {
+    try {
+      await _dio.put('/api/aulas/solicitudes/$solicitudId/en-camino');
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> completarApertura(int solicitudId) async {
+    try {
+      await _dio.put('/api/aulas/solicitudes/$solicitudId/completar');
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // --- SETTINGS ---
+
+  Future<String?> getGlobalSetting(String clave) async {
+    try {
+      final response = await _dio.get('/api/settings/$clave');
+      return response.statusCode == 200 ? response.data['valor'].toString() : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<bool> setGlobalSetting(String clave, String valor) async {
+    try {
+      final response = await _dio.post('/api/settings', data: {'clave': clave, 'valor': valor});
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>?> extractEvaluationPlan(String filePath) async {
+    try {
+      final formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(filePath, filename: 'plan.pdf'),
+      });
+      final response = await _dio.post('/api/planevaluacion/extract-pdf', data: formData);
+      return response.statusCode == 200 ? response.data : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<bool> liberarAula(int aulaId) async {
+    try {
+      await _dio.put('/api/aulas/$aulaId/liberar');
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // --- CACHE HELPERS ---
+
+  /// Get data from cache (in-memory + disk) with TTL check
+  Future<T?> _getCached<T>(String key) async {
+    // Check in-memory cache first (fastest)
+    if (_memoryCache.containsKey(key)) {
+      final entry = _memoryCache[key]!;
+      if (!entry.isExpired) {
+        return entry.data as T?;
+      } else {
+        _memoryCache.remove(key);
+      }
+    }
+
+    // Check disk cache as fallback
+    try {
+      final cached = await storage.read(key: key);
+      if (cached != null) {
+        final data = jsonDecode(cached);
+        // Restore to memory cache
+        _memoryCache[key] = _CacheEntry(data, _defaultCacheTTL);
+        return data as T?;
+      }
+    } catch (e) {
+      debugPrint('Cache read error: $e');
+    }
+    return null;
+  }
+
+  /// Set data in cache (in-memory + disk)
+  Future<void> _setCached<T>(String key, T data, {Duration? ttl}) async {
+    ttl ??= _defaultCacheTTL;
+    
+    // Set in-memory cache
+    _memoryCache[key] = _CacheEntry(data, ttl);
+
+    // Set disk cache
+    try {
+      final encoded = data is String ? data : jsonEncode(data);
+      await storage.write(key: key, value: encoded);
+    } catch (e) {
+      debugPrint('Cache write error: $e');
+    }
+  }
+
+  /// Clear cache by prefix
+  Future<void> _clearCacheByPrefix(String prefix) async {
+    _memoryCache.removeWhere((key, _) => key.startsWith(prefix));
+  }
+}
+
+/// Cache entry with TTL support
+class _CacheEntry {
+  final dynamic data;
+  final DateTime expiration;
+
+  _CacheEntry(this.data, Duration ttl) 
+    : expiration = DateTime.now().add(ttl);
+
+  bool get isExpired => DateTime.now().isAfter(expiration);
 }

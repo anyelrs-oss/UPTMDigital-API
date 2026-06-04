@@ -1,23 +1,36 @@
+
 import 'package:flutter/material.dart';
-import 'package:uptmdigital_app/models/horario.dart';
 import 'package:uptmdigital_app/models/asignatura.dart';
 import 'package:uptmdigital_app/services/api_service.dart';
+import 'package:uptmdigital_app/screens/chat_screen.dart';
+import 'package:uptmdigital_app/screens/plan_evaluacion_screen.dart';
+import 'package:uptmdigital_app/screens/my_grades_screen.dart';
 
 class HorariosScreen extends StatefulWidget {
   final bool isAdmin;
-  final int? studentId; // If student, filter by their subjects (optional logic, for now show all enrolled)
-  final int? professorId; // If professor, filter by their subjects
+  final int? studentId;
+  final int? professorId;
+  final int? asignaturaId;
+  final String? asignaturaNombre;
 
-  const HorariosScreen({super.key, this.isAdmin = false, this.studentId, this.professorId});
+  const HorariosScreen({
+    super.key,
+    this.isAdmin = false,
+    this.studentId,
+    this.professorId,
+    this.asignaturaId,
+    this.asignaturaNombre,
+  });
 
   @override
   State<HorariosScreen> createState() => _HorariosScreenState();
 }
 
 class _HorariosScreenState extends State<HorariosScreen> {
-  List<Asignatura> asignaturas = [];
-  Map<int, List<Horario>> horariosMap = {};
-  bool isLoading = true;
+  List<Asignatura> _asignaturas = [];
+  final Map<int, List<dynamic>> _horariosMap = {};
+  bool _isLoading = true;
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -26,125 +39,169 @@ class _HorariosScreenState extends State<HorariosScreen> {
   }
 
   Future<void> _loadData() async {
-    setState(() => isLoading = true);
+    setState(() => _isLoading = true);
+    final api = ApiService();
     try {
-      // 1. Load Asignaturas relevant to the user
-      final allAsignaturasData = await ApiService().getAsignaturas();
-      var list = allAsignaturasData.map<Asignatura>((json) => Asignatura.fromJson(json)).toList();
+      if (widget.asignaturaId != null) {
+        // Carga rápida: Solo una materia
+        final h = await api.getHorarios(widget.asignaturaId!);
+        _horariosMap[widget.asignaturaId!] = h;
+        // Creamos una asignatura ficticia para la UI si no la tenemos completa
+        _asignaturas = [Asignatura(
+          idAsignatura: widget.asignaturaId!,
+          nombre: widget.asignaturaNombre ?? "Materia Seleccionada",
+          codigo: "",
+          semestreNombre: ""
+        )];
+      } else {
+        // Carga completa (antigua, lenta)
+        final all = await api.getAsignaturas();
+        var list = all.map<Asignatura>((json) => Asignatura.fromJson(json)).toList();
 
-      if (widget.professorId != null) {
-        list = list.where((a) => a.profesorId == widget.professorId).toList();
-      } 
-      // For student, ideally we fetch enrolled subjects. For demo, we might show all or fetch enrollments.
-      // Let's simplified: If student, show all (or implement filter later). For now, show all.
-      
-      asignaturas = list;
+        if (widget.professorId != null) {
+          list = list.where((a) => a.profesorId == widget.professorId).toList();
+        }
 
-      // 2. Load Horarios for each Asignatura
-      for (var asig in asignaturas) {
-        final hData = await ApiService().getHorarios(asig.idAsignatura);
-        horariosMap[asig.idAsignatura] = hData.map<Horario>((json) => Horario.fromJson(json)).toList();
+        _asignaturas = list;
+        for (var a in _asignaturas) {
+          final h = await api.getHorarios(a.idAsignatura);
+          _horariosMap[a.idAsignatura] = h;
+        }
       }
     } catch (e) {
-      print("Error loading schedules: $e");
-    } finally {
-      setState(() => isLoading = false);
+      debugPrint(e.toString());
     }
+    if (mounted) setState(() => _isLoading = false);
   }
 
   @override
   Widget build(BuildContext context) {
+    final filtered = _asignaturas.where((a) => a.nombre.toLowerCase().contains(_searchQuery)).toList();
+    final String title = widget.asignaturaNombre ?? "Horarios Académicos";
+
     return Scaffold(
-      appBar: AppBar(title: const Text("Horarios de Clases")),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: asignaturas.length,
-              itemBuilder: (ctx, i) {
-                final asig = asignaturas[i];
-                final horarios = horariosMap[asig.idAsignatura] ?? [];
-
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  child: ExpansionTile(
-                    title: Text(asig.nombre, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text("${asig.codigo} - Semestre ${asig.semestreNombre}"),
-                    children: [
-                      if (horarios.isEmpty)
-                        const Padding(padding: EdgeInsets.all(16), child: Text("No hay horarios asignados.")),
-                      
-                      ...horarios.map((h) => ListTile(
-                        leading: const Icon(Icons.access_time, color: Colors.blue),
-                        title: Text("${h.dia}: ${h.horaInicio} - ${h.horaFin}"),
-                        subtitle: Text("Aula: ${h.aula}"),
-                        trailing: widget.isAdmin
-                            ? IconButton(
-                                icon: const Icon(Icons.delete, color: Colors.red),
-                                onPressed: () async {
-                                  await ApiService().deleteHorario(h.idHorario);
-                                  _loadData();
-                                },
-                              )
-                            : null,
-                      )),
-
-                      if (widget.isAdmin)
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: ElevatedButton.icon(
-                            icon: const Icon(Icons.add),
-                            label: const Text("Agregar Horario"),
-                            onPressed: () => _showAddHorarioDialog(asig),
-                          ),
-                        )
-                    ],
-                  ),
-                );
-              },
+      appBar: AppBar(title: Text(title)),
+      body: Column(
+        children: [
+          if (widget.asignaturaId == null) // Solo mostrar búsqueda si no es jerárquico
+            SearchFilterBar(
+              hintText: "Buscar materia...",
+              onSearchChanged: (val) => setState(() => _searchQuery = val.toLowerCase()),
             ),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : filtered.isEmpty
+                  ? const Center(child: Text("No hay horarios registrados"))
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: filtered.length,
+                      itemBuilder: (ctx, i) => _buildMateriaCard(filtered[i]),
+                    ),
+          ),
+        ],
+      ),
     );
   }
 
-  void _showAddHorarioDialog(Asignatura asig) {
-    final diaCtrl = TextEditingController();
-    final inicioCtrl = TextEditingController();
-    final finCtrl = TextEditingController();
-    final aulaCtrl = TextEditingController();
+  Widget _buildMateriaCard(Asignatura a) {
+    final list = _horariosMap[a.idAsignatura] ?? [];
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          ExpansionTile(
+            title: Text(a.nombre, style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Text("${a.codigo} • Semestre ${a.semestreNombre}"),
+            children: list.map((h) => ListTile(
+              leading: const Icon(Icons.access_time, size: 20, color: AppTheme.secondary),
+              title: Text("${h['dia']}: ${h['horaInicio']} - ${h['horaFin']}"),
+              subtitle: Text("Aula: ${h['aula']}"),
+              trailing: widget.isAdmin
+                  ? IconButton(icon: const Icon(Icons.edit_outlined, color: Colors.blue), onPressed: () => _showEditAulaDialog(h))
+                  : null,
+            )).toList(),
+          ),
+          if (widget.studentId != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildQuickAction(Icons.chat_bubble_outline, "Chat", () {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(
+                      asignaturaId: a.idAsignatura,
+                      title: a.nombre,
+                      userName: "Estudiante", // Se puede obtener del storage
+                    )));
+                  }),
+                  _buildQuickAction(Icons.assignment_outlined, "Plan", () {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => PlanEvaluacionScreen(
+                      asignaturaId: a.idAsignatura,
+                      asignaturaNombre: a.nombre,
+                    )));
+                  }),
+                  _buildQuickAction(Icons.grade_outlined, "Notas", () {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const MyGradesScreen()));
+                  }),
+                ],
+              ),
+            ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickAction(IconData icon, String label, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Icon(icon, size: 20, color: AppTheme.primary),
+          const SizedBox(height: 4),
+          Text(label, style: const TextStyle(fontSize: 10, color: AppTheme.primary, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  void _showEditAulaDialog(dynamic h) {
+    final aulaCtrl = TextEditingController(text: h['aula']);
+    final reasonCtrl = TextEditingController();
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text("Nuevo Horario para ${asig.nombre}"),
+        title: const Text("Cambiar Aula"),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: diaCtrl, decoration: const InputDecoration(labelText: "Día (Ej: Lunes)")),
-            TextField(controller: inicioCtrl, decoration: const InputDecoration(labelText: "Hora Inicio (Ej: 08:00)")),
-            TextField(controller: finCtrl, decoration: const InputDecoration(labelText: "Hora Fin (Ej: 10:00)")),
-            TextField(controller: aulaCtrl, decoration: const InputDecoration(labelText: "Aula")),
+            TextField(controller: aulaCtrl, decoration: const InputDecoration(labelText: "Nueva Aula")),
+            const SizedBox(height: 12),
+            TextField(controller: reasonCtrl, decoration: const InputDecoration(labelText: "Justificación"), maxLines: 2),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancelar")),
+          TextButton(onPressed: () { if (mounted) Navigator.pop(ctx); }, child: const Text("Cancelar")),
           ElevatedButton(
             onPressed: () async {
-              if (diaCtrl.text.isEmpty || inicioCtrl.text.isEmpty) return;
-              
-              final result = await ApiService().createHorario({
-                "asignaturaId": asig.idAsignatura,
-                "dia": diaCtrl.text,
-                "horaInicio": inicioCtrl.text,
-                "horaFin": finCtrl.text,
-                "aula": aulaCtrl.text
-              });
+              if (aulaCtrl.text.isNotEmpty && reasonCtrl.text.isNotEmpty) {
+                // Guardar motivo para auditoría
+                await ApiService().storage.write(key: 'pending_delete_reason', value: "CAMBIO AULA: ${reasonCtrl.text}");
 
-              if (result && mounted) {
-                Navigator.pop(ctx);
-                _loadData();
+                final success = await ApiService().createHorario({
+                  ...h,
+                  "aula": aulaCtrl.text
+                });
+                if (success) {
+                  if (mounted) Navigator.pop(ctx);
+                  _loadData();
+                }
               }
             },
-            child: const Text("Guardar"),
+            child: const Text("Actualizar"),
           )
         ],
       ),

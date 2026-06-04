@@ -28,6 +28,14 @@ namespace UPTMDigital.API.Data
         public DbSet<Semestre> Semestres { get; set; } = null!;
         public DbSet<Periodo> Periodos { get; set; } = null!;
         public DbSet<Notificacion> Notificaciones { get; set; } = null!;
+        public DbSet<Aula> Aulas { get; set; } = null!;
+        public DbSet<SolicitudApertura> SolicitudApertura { get; set; } = null!;
+        public DbSet<PinAsistencia> PinesAsistencia { get; set; } = null!;
+        public DbSet<EvaluacionConfig> EvaluacionesConfig { get; set; } = null!;
+        public DbSet<AuditLog> AuditLogs { get; set; } = null!;
+        public DbSet<ArancelValidacion> ArancelesValidaciones { get; set; } = null!;
+        public DbSet<Coordinador> Coordinadores { get; set; } = null!;
+        public DbSet<GlobalSetting> GlobalSettings { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -74,6 +82,37 @@ namespace UPTMDigital.API.Data
                 .WithMany()
                 .HasForeignKey(a => a.UsuarioId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // Índices para optimización de búsquedas y relaciones frecuentes
+            modelBuilder.Entity<Estudiante>()
+                .HasIndex(e => e.Cedula).IsUnique();
+            modelBuilder.Entity<Estudiante>()
+                .HasIndex(e => e.UsuarioId);
+            modelBuilder.Entity<Nota>()
+                .HasIndex(n => n.EstudianteId);
+            modelBuilder.Entity<Asistencia>()
+                .HasIndex(a => a.EstudianteId);
+
+            // Relaciones de SolicitudApertura
+            modelBuilder.Entity<SolicitudApertura>()
+                .HasOne(s => s.PersonalSeguridad)
+                .WithMany()
+                .HasForeignKey(s => s.PersonalSeguridadId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Vinculación PinAsistencia → Usuario (Coordinador)
+            modelBuilder.Entity<PinAsistencia>()
+                .HasOne(p => p.Coordinador)
+                .WithMany()
+                .HasForeignKey(p => p.CoordinadorId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Vinculación Usuario → RegistroInstitucional
+            modelBuilder.Entity<Usuario>()
+                .HasOne(u => u.RegistroInstitucional)
+                .WithMany()
+                .HasForeignKey(u => u.RegistroInstitucionalId)
+                .OnDelete(DeleteBehavior.SetNull);
         }
     }
 }

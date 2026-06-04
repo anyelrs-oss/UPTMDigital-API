@@ -27,12 +27,12 @@ class InstitutionalCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04), // Very subtle shadow
+            color: Colors.black.withValues(alpha: 0.04), // Very subtle shadow
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
-        border: Border.all(color: Colors.grey.withOpacity(0.1), width: 1),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.1), width: 1),
       ),
       child: Material(
         color: Colors.transparent,
@@ -60,7 +60,7 @@ class InstitutionalCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  Divider(height: 1, color: Colors.grey.withOpacity(0.1)),
+                  Divider(height: 1, color: Colors.grey.withValues(alpha: 0.1)),
                   const SizedBox(height: 12),
                 ],
                 if (child != null) child!,

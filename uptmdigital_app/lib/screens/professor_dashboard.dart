@@ -2,16 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:uptmdigital_app/theme.dart';
 import 'package:uptmdigital_app/services/api_service.dart';
 import 'package:uptmdigital_app/screens/login_screen.dart';
-import 'package:uptmdigital_app/screens/asignaturas_screen.dart'; // Reuse for now, will filter later
+// Reuse for now, will filter later
 import 'package:uptmdigital_app/screens/notas_screen.dart';
 import 'package:uptmdigital_app/screens/asistencias_screen.dart';
 import 'package:uptmdigital_app/widgets/anuncios_carousel.dart';
-import 'package:uptmdigital_app/screens/generate_qr_screen.dart';
 import 'package:uptmdigital_app/services/notification_service.dart';
-import 'package:flutter/services.dart'; // For Clipboard
+ // For Clipboard
 import 'package:uptmdigital_app/screens/horarios_screen.dart';
+import 'package:uptmdigital_app/screens/inbox_screen.dart';
 import 'package:uptmdigital_app/widgets/institutional_card.dart';
 import 'package:uptmdigital_app/widgets/menu_bottom_sheet.dart';
+import 'dart:convert';
 
 
 
@@ -40,39 +41,57 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
   }
 
   Future<void> _loadProfessorData() async {
-    final data = await ApiService().getProfessorMe();
-    if (mounted) {
+    final api = ApiService();
+
+    // 1. Cargar de caché primero
+    final cached = await api.storage.read(key: 'cached_professor_data');
+    if (cached != null && mounted) {
+      setState(() {
+        _professorData = jsonDecode(cached);
+        _isLoading = false;
+      });
+    }
+
+    // 2. Cargar de red para actualizar
+    final data = await api.getProfessorMe();
+    if (mounted && data != null) {
       setState(() {
         _professorData = data;
+        _isLoading = false;
+      });
+    } else if (mounted && _professorData == null) {
+      setState(() {
         _isLoading = false;
       });
     }
   }
 
-  void _showToken() async {
-    final token = await NotificationService().getToken();
-    if (mounted) {
-      showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text("FCM Token (Pruebas)"),
-          content: SelectableText(token ?? "No se pudo obtener el token (¿Falta configuración Web/Android?)"),
-          actions: [
-            TextButton(
-              onPressed: () {
-                if (token != null) {
-                  Clipboard.setData(ClipboardData(text: token));
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Token copiado")));
-                }
-                Navigator.pop(ctx);
-              },
-              child: const Text("Copiar y Cerrar"),
-            ),
-          ],
-        ),
-      );
-    }
+  void _confirmLogout() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Cerrar Sesión"),
+        content: const Text("¿Estás seguro de que deseas salir de tu cuenta?"),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancelar")),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await ApiService().logout();
+              if (mounted) {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text("Cerrar Sesión"),
+          ),
+        ],
+      ),
+    );
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -129,13 +148,16 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
         activePage = _buildHomeTab();
         break;
       case 1:
-        activePage = AsignaturasScreen(professorId: _professorData!['idProfesor']);
+        activePage = const HorariosScreen(isAdmin: false);
+        break;
+      case 2:
+        activePage = const InboxScreen(); // Real Inbox
         break;
       case 3:
-        activePage = NotasScreen(professorId: _professorData!['idProfesor']);
+        activePage = const NotasScreen();
         break;
       case 4:
-        activePage = AsistenciasScreen(professorId: _professorData!['idProfesor']);
+        activePage = const AsistenciasScreen();
         break;
       default:
         activePage = _buildHomeTab();
@@ -145,17 +167,11 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
       extendBody: true,
       appBar: AppBar(
         title: Text("Prof. ${_professorData!['nombres']} ${_professorData!['apellidos']}"),
+        automaticallyImplyLeading: false,
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await ApiService().logout();
-              if (context.mounted) {
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                );
-              }
-            },
+            onPressed: _confirmLogout,
           ),
         ],
       ),
@@ -185,11 +201,11 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _buildNavItem(Icons.home, "Inicio", 0),
-            _buildNavItem(Icons.book, "Clases", 1),
+            _buildNavItem(Icons.home_outlined, "Inicio", 0),
+            _buildNavItem(Icons.calendar_today_outlined, "Horario", 1),
             const SizedBox(width: 40), // FAB Space
-            _buildNavItem(Icons.grade, "Notas", 3),
-            _buildNavItem(Icons.check_circle, "Asistencia", 4),
+            _buildNavItem(Icons.chat_bubble_outline, "Chats", 2),
+            _buildNavItem(Icons.grade_outlined, "Notas", 3),
           ],
         ),
       ),
@@ -235,7 +251,7 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
             children: [
               CircleAvatar(
                 radius: 30,
-                backgroundColor: AppTheme.secondary.withOpacity(0.1),
+                backgroundColor: AppTheme.secondary.withValues(alpha: 0.1),
                 backgroundImage: _professorData!['fotoUrl'] != null ? NetworkImage(_professorData!['fotoUrl']) : null,
                 child: _professorData!['fotoUrl'] == null 
                     ? Text(_professorData!['nombres'][0], style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.secondary))
@@ -286,26 +302,10 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
     );
   }
 
-  Widget _buildActionRow(IconData icon, String label, VoidCallback onTap) {
-    return ListTile(
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: AppTheme.primary.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(icon, color: AppTheme.primary),
-      ),
-      title: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-      trailing: const Icon(Icons.chevron_right, color: Colors.grey),
-      onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-    );
-  }
 
   void _showEditProfileDialog() {
-    final _telefonoController = TextEditingController(text: _professorData!['telefono']);
-    final _correoController = TextEditingController(text: _professorData!['correoInstitucional']);
+    final telefonoController = TextEditingController(text: _professorData!['telefono']);
+    final correoController = TextEditingController(text: _professorData!['correoInstitucional']);
 
     showDialog(
       context: context,
@@ -315,11 +315,11 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
-              controller: _telefonoController,
+              controller: telefonoController,
               decoration: const InputDecoration(labelText: "Teléfono"),
             ),
             TextField(
-              controller: _correoController,
+              controller: correoController,
               decoration: const InputDecoration(labelText: "Correo Institucional"),
             ),
           ],
@@ -333,13 +333,14 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
             onPressed: () async {
               final updatedData = {
                 ..._professorData!,
-                "telefono": _telefonoController.text,
-                "correoInstitucional": _correoController.text,
+                "telefono": telefonoController.text,
+                "correoInstitucional": correoController.text,
               };
               
               final success = await ApiService().updateProfesor(_professorData!['idProfesor'], updatedData);
+              if (!mounted) return;
               if (success) {
-                 Navigator.pop(ctx);
+                 if (ctx.mounted) Navigator.pop(ctx);
                  _loadProfessorData(); // Refresh
                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Perfil actualizado")));
               } else {

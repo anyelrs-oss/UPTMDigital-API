@@ -5,6 +5,7 @@ class Anuncio {
   final String fechaPublicacion;
   final String? autor;
   final int? usuarioId;
+  final String prioridad;
 
   Anuncio({
     required this.idAnuncio,
@@ -13,16 +14,18 @@ class Anuncio {
     required this.fechaPublicacion,
     this.autor,
     this.usuarioId,
+    this.prioridad = "Normal",
   });
 
   factory Anuncio.fromJson(Map<String, dynamic> json) {
     return Anuncio(
-      idAnuncio: json['idAnuncio'],
-      titulo: json['titulo'],
-      contenido: json['contenido'],
-      fechaPublicacion: json['fechaPublicacion'],
+      idAnuncio: json['idAnuncio'] ?? 0,
+      titulo: json['titulo'] ?? '',
+      contenido: json['contenido'] ?? '',
+      fechaPublicacion: json['fechaPublicacion'] ?? '',
       autor: json['autor'],
       usuarioId: json['usuarioId'],
+      prioridad: json['prioridad'] ?? 'Normal',
     );
   }
 }

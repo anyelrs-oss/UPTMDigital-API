@@ -97,6 +97,32 @@ namespace UPTMDigital.API.Controllers
             });
         }
 
+        [HttpGet("historial")]
+        public async Task<IActionResult> GetHistorialGlobal([FromQuery] int limit = 50)
+        {
+            var historial = await _context.ControlAccesos
+                .OrderByDescending(c => c.FechaHora)
+                .Take(limit)
+                .ToListAsync();
+
+            // Enriquecer con nombres (Opcional si quieres evitar N+1, mejor usar un Join)
+            var cedulas = historial.Select(h => h.Cedula).Distinct().ToList();
+            var estudiantes = await _context.Estudiantes.Where(e => cedulas.Contains(e.Cedula)).ToDictionaryAsync(e => e.Cedula, e => $"{e.Nombres} {e.Apellidos}");
+            var profesores = await _context.Profesores.Where(p => cedulas.Contains(p.Cedula)).ToDictionaryAsync(p => p.Cedula, p => $"{p.Nombres} {p.Apellidos}");
+
+            var resultado = historial.Select(h => new {
+                h.IdAcceso,
+                h.Cedula,
+                h.Tipo,
+                h.Ubicacion,
+                h.FechaHora,
+                Nombre = estudiantes.ContainsKey(h.Cedula) ? estudiantes[h.Cedula] : (profesores.ContainsKey(h.Cedula) ? profesores[h.Cedula] : "Visitante/Otro"),
+                Rol = estudiantes.ContainsKey(h.Cedula) ? "Estudiante" : (profesores.ContainsKey(h.Cedula) ? "Profesor" : "N/A")
+            });
+
+            return Ok(resultado);
+        }
+
         [HttpGet("historial/{cedula}")]
         public async Task<IActionResult> GetHistorial(string cedula)
         {

@@ -94,18 +94,21 @@ class _ProfessorFormScreenState extends State<ProfessorFormScreen> {
             children: [
               TextFormField(
                 controller: _cedulaController,
+                enabled: !isEditing, // Bloqueado
                 decoration: const InputDecoration(labelText: 'Cédula'),
                 validator: (value) => value == null || value.isEmpty ? 'Campo requerido' : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _nombresController,
+                enabled: !isEditing, // Bloqueado
                 decoration: const InputDecoration(labelText: 'Nombres'),
                 validator: (value) => value == null || value.isEmpty ? 'Campo requerido' : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _apellidosController,
+                enabled: !isEditing, // Bloqueado
                 decoration: const InputDecoration(labelText: 'Apellidos'),
                 validator: (value) => value == null || value.isEmpty ? 'Campo requerido' : null,
               ),
@@ -118,6 +121,7 @@ class _ProfessorFormScreenState extends State<ProfessorFormScreen> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _departamentoController,
+                enabled: !isEditing, // Bloqueado
                 decoration: const InputDecoration(labelText: 'Departamento'),
               ),
               const SizedBox(height: 32),

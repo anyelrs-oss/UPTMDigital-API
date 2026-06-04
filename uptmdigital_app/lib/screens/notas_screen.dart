@@ -1,164 +1,132 @@
 import 'package:flutter/material.dart';
-import 'package:uptmdigital_app/models/nota.dart';
 import 'package:uptmdigital_app/services/api_service.dart';
-import 'package:uptmdigital_app/screens/nota_form_screen.dart';
+import 'package:uptmdigital_app/theme.dart';
+import 'package:uptmdigital_app/widgets/search_filter_bar.dart';
+import 'package:intl/intl.dart';
 
 class NotasScreen extends StatefulWidget {
   final int? professorId;
-  const NotasScreen({super.key, this.professorId});
+  final int? asignaturaId;
+  final String? asignaturaNombre;
+
+  const NotasScreen({super.key, this.professorId, this.asignaturaId, this.asignaturaNombre});
 
   @override
   State<NotasScreen> createState() => _NotasScreenState();
 }
 
 class _NotasScreenState extends State<NotasScreen> {
-  late Future<List<Nota>> futureNotas;
+  List<dynamic> _notas = [];
+  bool _isLoading = true;
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
-    futureNotas = _loadNotas();
+    _loadNotas();
   }
 
-  Future<List<Nota>> _loadNotas() async {
-    try {
-      final data = await ApiService().getNotas();
-      var list = data.map<Nota>((json) => Nota.fromJson(json)).toList();
-      if (widget.professorId != null) {
-        list = list.where((n) => n.profesorId == widget.professorId).toList();
-      }
-      return list;
-    } catch (e) {
-      return [];
+  Future<void> _loadNotas() async {
+    setState(() => _isLoading = true);
+    final data = await ApiService().getNotas(
+      search: _searchQuery.isEmpty ? null : _searchQuery,
+      asignaturaId: widget.asignaturaId,
+    );
+    if (mounted) {
+      setState(() {
+        _notas = data;
+        _isLoading = false;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final String title = widget.asignaturaNombre ?? "Control de Calificaciones";
+
     return Scaffold(
-      appBar: AppBar(title: const Text("Notas")),
-      body: FutureBuilder<List<Nota>>(
-        future: futureNotas,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return const Center(child: Text("Error al cargar notas"));
-          } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
-            return ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: snapshot.data!.length,
-              separatorBuilder: (ctx, i) => const SizedBox(height: 12),
-              itemBuilder: (_, i) {
-                final item = snapshot.data![i];
-                return Card(
-                  child: ListTile(
-                    title: Text("Nota: ${item.calificacion}"),
-                    subtitle: Text("Estudiante ID: ${item.estudianteId} - Asignatura ID: ${item.asignaturaId}"),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (widget.professorId != null) // Only show edit if viewing as Professor (filtered by professorId)
-                          IconButton(
-                            icon: const Icon(Icons.edit, color: Colors.blue),
-                            onPressed: () {
-                              _showEditNotaDialog(item);
-                            },
-                          ),
-                        IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          onPressed: () async {
-                            await ApiService().deleteNota(item.idNota);
-                            setState(() {
-                              futureNotas = _loadNotas();
-                            });
-                          },
-                        ),
-                      ],
-                    ),
-                    onTap: () async {
-                      // Keep existing detailed edit/view
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => NotaFormScreen(nota: item)),
-                      );
-                      if (result == true) {
-                        setState(() {
-                          futureNotas = _loadNotas();
-                        });
-                      }
-                    },
-                  ),
-                );
+      appBar: AppBar(title: Text(title)),
+      body: Column(
+        children: [
+          if (widget.asignaturaId == null) // Solo mostrar búsqueda si no es jerárquico
+            SearchFilterBar(
+              hintText: "Buscar por cédula o nombre...",
+              onSearchChanged: (val) {
+                _searchQuery = val;
+                _loadNotas();
               },
-            );
-          }
-          return const Center(child: Text("No hay notas"));
-        },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const NotaFormScreen()),
-          );
-          if (result == true) {
-            setState(() {
-              futureNotas = _loadNotas();
-            });
-          }
-        },
-        child: const Icon(Icons.add),
+            ),
+          Expanded(
+            child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _notas.isEmpty
+                ? const Center(child: Text("No se encontraron registros."))
+                : RefreshIndicator(
+                    onRefresh: _loadNotas,
+                    child: ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _notas.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      itemBuilder: (_, i) => _buildNotaCard(_notas[i]),
+                    ),
+                  ),
+          ),
+        ],
       ),
     );
   }
-  void _showEditNotaDialog(Nota nota) {
-    final _calificacionController = TextEditingController(text: nota.calificacion?.toString() ?? "");
-    
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text("Editar Nota"),
-        content: TextField(
-          controller: _calificacionController,
-          decoration: const InputDecoration(labelText: "Calificación"),
-          keyboardType: TextInputType.number,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text("Cancelar"),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final newValue = double.tryParse(_calificacionController.text);
-              if (newValue == null) {
-                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Valor inválido")));
-                 return;
-              }
 
-              // Create updated map
-              final updatedData = nota.toJson();
-              updatedData['calificacion'] = newValue;
-              
-              // We need to ensure we don't send nulls for required fields or fields that confuse backend if they are present but unchanged 
-              // (usually safer to just send what we have if backend accepts full object updates, or patch if patches)
-              // Here we assume PUT replaces or updates.
-              
-              final success = await ApiService().updateNota(nota.idNota, updatedData);
-              if (success) {
-                 Navigator.pop(ctx);
-                 setState(() {
-                   futureNotas = _loadNotas();
-                 });
-                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Nota actualizada")));
-              } else {
-                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Error al actualizar nota")));
-              }
-            },
-            child: const Text("Guardar"),
-          ),
-        ],
+  Widget _buildNotaCard(dynamic n) {
+    final date = DateTime.parse(n['fecha']);
+    final audit = n['audit'];
+
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    n['estudianteNombre'] ?? "Estudiante",
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(color: AppTheme.primary, borderRadius: BorderRadius.circular(12)),
+                  child: Text(
+                    "${n['calificacion']} pts",
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text("C.I: ${n['estudianteCedula']} • ${n['asignaturaNombre']}", style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+            const Divider(height: 24),
+            Row(
+              children: [
+                const Icon(Icons.history, size: 14, color: Colors.grey),
+                const SizedBox(width: 4),
+                Text(
+                  "Subida: ${DateFormat('dd/MM/yyyy HH:mm').format(date.toLocal())}",
+                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                ),
+                const Spacer(),
+                if (audit != null) ...[
+                  const Icon(Icons.lan_outlined, size: 14, color: Colors.grey),
+                  const SizedBox(width: 4),
+                  Text("IP: ${audit['ip']}", style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                ]
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

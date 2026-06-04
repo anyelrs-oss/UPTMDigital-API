@@ -19,87 +19,153 @@ namespace UPTMDigital.API.Controllers
         }
 
         /// <summary>
-        /// Mensajes de una asignatura específica (chat del aula).
-        /// </summary>
-        [HttpGet("{asignaturaId}")]
-        public async Task<ActionResult<IEnumerable<Mensaje>>> GetMensajes(int asignaturaId)
-        {
-            return await _context.Mensajes
-                .Where(m => m.AsignaturaId == asignaturaId)
-                .OrderBy(m => m.FechaEnvio)
-                .ToListAsync();
-        }
-
-        /// <summary>
-        /// Retorna la lista de chats del usuario autenticado.
-        /// Un "chat" = asignatura donde el usuario tiene inscripción o es profesor.
+        /// Retorna la lista de chats del usuario autenticado (Asignaturas + Privados).
         /// </summary>
         [Authorize]
         [HttpGet("mis-chats")]
         public async Task<IActionResult> GetMisChats()
         {
             var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            var role = User.FindFirst(ClaimTypes.Role)?.Value;
-
             if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out var userId))
                 return Unauthorized();
 
-            List<int> asignaturaIds;
+            var role = User.FindFirst(ClaimTypes.Role)?.Value;
+
+            // 1. Obtener datos básicos del usuario
+            var user = await _context.Usuarios.FindAsync(userId);
+            if (user == null) return NotFound();
+
+            List<int> asignaturaIds = new List<int>();
+            int? userCarreraId = null;
 
             if (role == "Profesor")
             {
-                var profesor = await _context.Profesores
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync(p => p.UsuarioId == userId);
-
-                if (profesor == null) return NotFound();
-
-                asignaturaIds = await _context.Asignaturas
-                    .AsNoTracking()
-                    .Where(a => a.ProfesorId == profesor.IdProfesor)
-                    .Select(a => a.IdAsignatura)
-                    .ToListAsync();
+                var profesor = await _context.Profesores.AsNoTracking().FirstOrDefaultAsync(p => p.UsuarioId == userId);
+                if (profesor != null)
+                {
+                    asignaturaIds = await _context.Asignaturas.AsNoTracking().Where(a => a.ProfesorId == profesor.IdProfesor).Select(a => a.IdAsignatura).ToListAsync();
+                    // Buscamos su carrera (departamento)
+                    userCarreraId = (await _context.Carreras.FirstOrDefaultAsync(c => c.Nombre == profesor.Departamento))?.IdCarrera;
+                }
+            }
+            else if (role == "Coordinador")
+            {
+                var coord = await _context.Coordinadores.AsNoTracking().FirstOrDefaultAsync(c => c.UsuarioId == userId);
+                if (coord != null) userCarreraId = coord.CarreraId;
             }
             else
             {
-                var estudiante = await _context.Estudiantes
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync(e => e.UsuarioId == userId);
-
-                if (estudiante == null) return NotFound();
-
-                asignaturaIds = await _context.Inscripciones
-                    .AsNoTracking()
-                    .Where(i => i.EstudianteId == estudiante.IdEstudiante)
-                    .Select(i => i.AsignaturaId)
-                    .ToListAsync();
+                var estudiante = await _context.Estudiantes.AsNoTracking().FirstOrDefaultAsync(e => e.UsuarioId == userId);
+                if (estudiante != null)
+                {
+                    asignaturaIds = await _context.Inscripciones.AsNoTracking().Where(i => i.EstudianteId == estudiante.IdEstudiante).Select(i => i.AsignaturaId).ToListAsync();
+                    userCarreraId = estudiante.CarreraId;
+                }
             }
 
-            // Para cada asignatura, obtener el último mensaje como preview
-            var chats = await _context.Asignaturas
+            // 2. Obtener chat de Carrera (Si tiene una carrera asignada)
+            var chatCarrera = new List<object>();
+            if (userCarreraId.HasValue)
+            {
+                var carrera = await _context.Carreras.FindAsync(userCarreraId.Value);
+                if (carrera != null)
+                {
+                    var ultimo = await _context.Mensajes
+                        .Where(m => m.TipoChat == "Carrera" && m.CarreraId == userCarreraId.Value)
+                        .OrderByDescending(m => m.FechaEnvio)
+                        .Select(m => new { m.Contenido, m.FechaEnvio, m.EmisorNombre })
+                        .FirstOrDefaultAsync();
+
+                    chatCarrera.Add(new
+                    {
+                        tipo = "Carrera",
+                        id = carrera.IdCarrera,
+                        nombre = "SALA: " + carrera.Nombre,
+                        ultimoMensaje = ultimo
+                    });
+                }
+            }
+
+            // 3. Obtener chats de asignaturas
+            var chatsAsignatura = await _context.Asignaturas
                 .AsNoTracking()
                 .Where(a => asignaturaIds.Contains(a.IdAsignatura))
                 .Select(a => new
                 {
-                    asignaturaId = a.IdAsignatura,
+                    tipo = "Asignatura",
+                    id = a.IdAsignatura,
                     nombre = a.Nombre,
-                    codigo = a.Codigo,
-                    departamento = a.Departamento,
                     ultimoMensaje = _context.Mensajes
-                        .Where(m => m.AsignaturaId == a.IdAsignatura)
+                        .Where(m => m.AsignaturaId == a.IdAsignatura && m.TipoChat == "Asignatura")
                         .OrderByDescending(m => m.FechaEnvio)
-                        .Select(m => new
-                        {
-                            m.Contenido,
-                            m.FechaEnvio,
-                            m.EmisorNombre
-                        })
+                        .Select(m => new { m.Contenido, m.FechaEnvio, m.EmisorNombre })
                         .FirstOrDefault()
                 })
-                .OrderByDescending(c => c.ultimoMensaje != null ? c.ultimoMensaje.FechaEnvio : DateTime.MinValue)
                 .ToListAsync();
 
-            return Ok(chats);
+            // 3. Obtener chats privados (Donde el usuario es emisor o receptor) - OPTIMIZADO: Sin N+1 queries
+            var chatsPrivados = await _context.Mensajes
+                .AsNoTracking()
+                .Where(m => m.TipoChat == "Privado" && (m.UsuarioId == userId || m.ReceptorUsuarioId == userId))
+                .GroupBy(m => m.UsuarioId == userId ? m.ReceptorUsuarioId : m.UsuarioId)
+                .Select(g => new
+                {
+                    peerId = g.Key,
+                    ultimoMensaje = g.OrderByDescending(m => m.FechaEnvio)
+                        .Select(m => new { m.Contenido, m.FechaEnvio, m.EmisorNombre })
+                        .FirstOrDefault()
+                })
+                .ToListAsync();
+
+            // Obtener datos de usuarios en UNA sola query
+            var peerIds = chatsPrivados.Where(c => c.peerId.HasValue).Select(c => c.peerId.Value).ToList();
+            var usuarios = await _context.Usuarios
+                .AsNoTracking()
+                .Where(u => peerIds.Contains(u.IdUsuario))
+                .ToDictionaryAsync(u => u.IdUsuario, u => u);
+
+            var chatsPrivadosFormatted = new List<object>();
+            foreach (var chat in chatsPrivados)
+            {
+                if (chat.peerId.HasValue && usuarios.TryGetValue(chat.peerId.Value, out var peer))
+                {
+                    chatsPrivadosFormatted.Add(new
+                    {
+                        tipo = "Privado",
+                        id = peer.IdUsuario,
+                        nombre = peer.NombreUsuario,
+                        ultimoMensaje = chat.ultimoMensaje
+                    });
+                }
+            }
+
+            var allChats = chatCarrera.Concat(chatsAsignatura.Cast<object>()).Concat(chatsPrivadosFormatted).ToList();
+            return Ok(allChats);
+        }
+
+        [Authorize]
+        [HttpGet("carrera/{carreraId}")]
+        public async Task<ActionResult<IEnumerable<Mensaje>>> GetMensajesCarrera(int carreraId)
+        {
+            return await _context.Mensajes
+                .Where(m => m.CarreraId == carreraId && m.TipoChat == "Carrera")
+                .OrderBy(m => m.FechaEnvio)
+                .ToListAsync();
+        }
+
+        [Authorize]
+        [HttpGet("privado/{peerUserId}")]
+        public async Task<ActionResult<IEnumerable<Mensaje>>> GetMensajesPrivados(int peerUserId)
+        {
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
+
+            return await _context.Mensajes
+                .Where(m => m.TipoChat == "Privado" &&
+                      ((m.UsuarioId == userId && m.ReceptorUsuarioId == peerUserId) ||
+                       (m.UsuarioId == peerUserId && m.ReceptorUsuarioId == userId)))
+                .OrderBy(m => m.FechaEnvio)
+                .ToListAsync();
         }
 
         /// <summary>

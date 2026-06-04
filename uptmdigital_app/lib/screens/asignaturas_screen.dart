@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:uptmdigital_app/models/asignatura.dart';
 import 'package:uptmdigital_app/services/api_service.dart';
-import 'package:uptmdigital_app/theme.dart';
-import 'package:uptmdigital_app/screens/asignatura_form_screen.dart';
 import 'package:uptmdigital_app/screens/chat_screen.dart';
-import 'package:uptmdigital_app/services/pdf_service.dart';
-import 'package:uptmdigital_app/services/excel_service.dart';
+import 'package:uptmdigital_app/screens/evaluar_screen.dart';
+import 'package:uptmdigital_app/screens/asistencias_screen.dart';
+import 'package:uptmdigital_app/screens/estudiantes_screen.dart';
 import 'package:uptmdigital_app/widgets/search_filter_bar.dart';
 
 class AsignaturasScreen extends StatefulWidget {
@@ -32,16 +31,19 @@ class _AsignaturasScreenState extends State<AsignaturasScreen> {
 
   Future<void> _loadAsignaturas() async {
     setState(() => _isLoading = true);
+    final api = ApiService();
+
     try {
-      final data = await ApiService().getAsignaturas();
+      final data = await api.getAsignaturas();
       var list = data.map<Asignatura>((json) => Asignatura.fromJson(json)).toList();
+
       if (widget.professorId != null) {
         list = list.where((a) => a.profesorId == widget.professorId).toList();
       }
 
       final deptSet = <String>{};
       for (var a in list) {
-        if (a.departamento != null && a.departamento!.isNotEmpty) deptSet.add(a.departamento!);
+        if (a.departamento.isNotEmpty) deptSet.add(a.departamento);
       }
 
       if (mounted) {
@@ -115,19 +117,7 @@ class _AsignaturasScreenState extends State<AsignaturasScreen> {
             child: _isLoading
               ? const Center(child: CircularProgressIndicator())
               : _filtered.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.book_outlined, size: 64, color: Colors.grey[300]),
-                        const SizedBox(height: 16),
-                        Text(
-                          _searchQuery.isNotEmpty ? "Sin resultados" : "No hay asignaturas registradas",
-                          style: TextStyle(fontSize: 16, color: Colors.grey[500]),
-                        ),
-                      ],
-                    ),
-                  )
+                ? const Center(child: Text("No hay asignaturas registradas"))
                 : RefreshIndicator(
                     onRefresh: _loadAsignaturas,
                     child: ListView.separated(
@@ -140,128 +130,116 @@ class _AsignaturasScreenState extends State<AsignaturasScreen> {
           ),
         ],
       ),
-      floatingActionButton: widget.professorId == null ? FloatingActionButton(
-        onPressed: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const AsignaturaFormScreen()),
-          );
-          if (result == true) _loadAsignaturas();
-        },
-        child: const Icon(Icons.add),
-      ) : null,
     );
   }
 
   Widget _buildAsignaturaCard(Asignatura a) {
+    final bool isAdmin = widget.professorId == null;
+
     return Card(
       elevation: 2,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => AsignaturaFormScreen(asignatura: a)),
-          );
-          if (result == true) _loadAsignaturas();
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              CircleAvatar(
-                backgroundColor: Colors.purple.withOpacity(0.1),
-                child: Text(
-                  a.nombre.isNotEmpty ? a.nombre[0].toUpperCase() : "A",
-                  style: const TextStyle(color: Colors.purple),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: Colors.purple.withValues(alpha: 0.1),
+                  child: Text(
+                    a.nombre.isNotEmpty ? a.nombre[0].toUpperCase() : "A",
+                    style: const TextStyle(color: Colors.purple),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(a.nombre, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[200],
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(a.codigo, style: TextStyle(fontSize: 12, color: Colors.grey[800])),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          "Sem: ${a.semestreNombre} • UC: ${a.creditos}",
-                          style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ],
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(a.nombre, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14), maxLines: 2, overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 4),
+                      Text(
+                        "Cod: ${a.codigo} • Sem: ${a.semestreNombre}",
+                        style: TextStyle(color: Colors.grey[600], fontSize: 11),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.chat, color: Colors.blue),
-                onPressed: () {
-                  Navigator.push(context, MaterialPageRoute(
-                    builder: (_) => ChatScreen(
-                      asignaturaId: a.idAsignatura,
-                      asignaturaNombre: a.nombre,
-                      userName: "Profesor",
-                    ),
-                  ));
-                },
-              ),
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.download_for_offline, color: Colors.green),
-                onSelected: (value) async {
-                  final students = await ApiService().getInscripcionesByAsignatura(a.idAsignatura);
-                  if (students.isEmpty) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("No hay estudiantes inscritos.")));
-                    }
-                    return;
-                  }
-                  if (value == 'pdf') {
-                    await PdfService().generateClassListPdf(a.nombre, students);
-                  } else if (value == 'excel') {
-                    await ExcelService().generateClassListExcel(a.nombre, students);
-                  }
-                },
-                itemBuilder: (ctx) => [
-                  const PopupMenuItem(value: 'pdf', child: Row(children: [Icon(Icons.picture_as_pdf, color: Colors.red), SizedBox(width: 8), Text('Lista en PDF')])),
-                  const PopupMenuItem(value: 'excel', child: Row(children: [Icon(Icons.table_chart, color: Colors.green), SizedBox(width: 8), Text('Lista en Excel')])),
-                ],
-              ),
-              IconButton(
-                icon: const Icon(Icons.delete_outline, color: Colors.red),
-                onPressed: () => _confirmDelete(a),
-              ),
-            ],
-          ),
+              ],
+            ),
+            const Divider(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildQuickAction(
+                  icon: Icons.people_outline,
+                  label: "Alumnos",
+                  color: Colors.green,
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EstudiantesScreen())),
+                ),
+                _buildQuickAction(
+                  icon: Icons.chat_bubble_outline,
+                  label: "Chat",
+                  color: Colors.blue,
+                  onTap: () {
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => ChatScreen(
+                        asignaturaId: a.idAsignatura,
+                        title: a.nombre,
+                        userName: "Administrador",
+                      ),
+                    ));
+                  },
+                ),
+                _buildQuickAction(
+                  icon: Icons.check_circle_outline,
+                  label: "Asistencias",
+                  color: Colors.orange,
+                  onTap: () {
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => AsistenciasScreen(
+                        asignaturaId: a.idAsignatura,
+                        asignaturaNombre: a.nombre,
+                      ),
+                    ));
+                  },
+                ),
+                if (!isAdmin) // Acciones extra si es profesor
+                  _buildQuickAction(
+                    icon: Icons.assignment_outlined,
+                    label: "Evaluar",
+                    color: Colors.teal,
+                    onTap: () {
+                      Navigator.push(context, MaterialPageRoute(
+                        builder: (_) => EvaluarScreen(
+                          asignaturaId: a.idAsignatura,
+                          asignaturaNombre: a.nombre,
+                        ),
+                      ));
+                    },
+                  ),
+              ],
+            ),
+          ],
         ),
       ),
     );
   }
 
-  void _confirmDelete(Asignatura a) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text("Desactivar Asignatura"),
-        content: Text("¿Desactivar ${a.nombre}?"),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancelar")),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("Desactivar", style: TextStyle(color: Colors.red))),
-        ],
+  Widget _buildQuickAction({required IconData icon, required String label, required Color color, required VoidCallback onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 22),
+            const SizedBox(height: 4),
+            Text(label, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
+          ],
+        ),
       ),
     );
-    if (confirm == true) {
-      final success = await ApiService().deleteAsignatura(a.idAsignatura);
-      if (success) _loadAsignaturas();
-    }
   }
 }

@@ -16,6 +16,11 @@ namespace UPTMDigital.API.Models
         public DateTime? UltimoAcceso { get; set; }
         public bool Activo { get; set; } = true;
 
+        // --- Vinculación con Nómina ---
+        public int? RegistroInstitucionalId { get; set; }
+        [ForeignKey("RegistroInstitucionalId")]
+        public RegistroInstitucional? RegistroInstitucional { get; set; }
+
         public Rol Rol { get; set; } = null!;
     }
 }

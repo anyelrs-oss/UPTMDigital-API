@@ -533,7 +533,7 @@ namespace UPTMDigital.API.Controllers
             try
             {
                 // 1.1 Seed Roles (Critical for User Creation)
-                var rolesNames = new[] { "Administrador", "Profesor", "Estudiante", "Seguridad" };
+                var rolesNames = new[] { "Administrador", "Profesor", "Estudiante", "Seguridad", "Secretaria", "SuperAdmin", "Auditor" };
                 foreach (var rName in rolesNames)
                 {
                     if (!await _context.Roles.AnyAsync(r => r.NombreRol == rName))
@@ -647,6 +647,36 @@ namespace UPTMDigital.API.Controllers
                         _context.Usuarios.Add(prof2User);
                         await _context.SaveChangesAsync();
                         log.Add("Created user 'profesor2'");
+
+                // 3. Seed New Roles for Test (Secretaria, Auditor, Seguridad, Coordinador)
+                var demoUsers = new[] {
+                    new { Role = "Secretaria", User = "secretaria1", Pass = "123456", CI = "V-11111111" },
+                    new { Role = "Auditor", User = "auditor1", Pass = "123456", CI = "V-22222222" },
+                    new { Role = "Seguridad", User = "seguridad1", Pass = "123456", CI = "V-33333333" },
+                    new { Role = "Coordinador", User = "coordinador1", Pass = "123456", CI = "V-44444444" }
+                };
+
+                foreach (var demo in demoUsers)
+                {
+                    if (!await _context.Usuarios.AnyAsync(u => u.NombreUsuario == demo.User))
+                    {
+                        var rol = await _context.Roles.FirstOrDefaultAsync(r => r.NombreRol == demo.Role);
+                        if (rol != null)
+                        {
+                            var u = new Usuario
+                            {
+                                NombreUsuario = demo.User,
+                                ContrasenaHash = demo.Pass,
+                                RolId = rol.IdRol,
+                                Cedula = demo.CI,
+                                EstadoCuenta = true,
+                                Activo = true
+                            };
+                            _context.Usuarios.Add(u);
+                            log.Add($"Created demo user '{demo.User}' with role {demo.Role}");
+                        }
+                    }
+                }
 
                         // Create associated Professor entity
                         var newProf = new Profesor

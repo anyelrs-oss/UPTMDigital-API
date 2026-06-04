@@ -31,5 +31,9 @@ namespace UPTMDigital.API.Models
 
         public DateTime? FechaRegistro { get; set; }
         public bool Activo { get; set; } = true;
+
+        // --- Fase 8: Estado de Arancel ---
+        // true = Solvente, false = Pendiente
+        public bool EstadoArancel { get; set; } = true;
     }
 }

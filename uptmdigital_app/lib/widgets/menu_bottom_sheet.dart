@@ -6,7 +6,10 @@ import 'package:uptmdigital_app/screens/horarios_screen.dart';
 import 'package:uptmdigital_app/screens/constancias_screen.dart';
 import 'package:uptmdigital_app/screens/generate_qr_screen.dart';
 import 'package:uptmdigital_app/screens/asistencias_screen.dart';
-import 'package:uptmdigital_app/screens/notas_screen.dart'; // Assuming this exists or will exist
+import 'package:uptmdigital_app/screens/notas_screen.dart';
+import 'package:uptmdigital_app/screens/my_grades_screen.dart';
+import 'package:uptmdigital_app/screens/noticias_list_screen.dart';
+import 'package:uptmdigital_app/screens/inbox_screen.dart';
 
 class MenuBottomSheet extends StatelessWidget {
   final String role; // 'admin', 'student', 'professor', 'security'
@@ -47,13 +50,13 @@ class MenuBottomSheet extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 20,
-                  backgroundColor: AppTheme.secondary.withOpacity(0.1),
+                  backgroundColor: AppTheme.secondary.withValues(alpha: 0.1),
                   child: const Icon(Icons.apps, color: AppTheme.secondary),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    "Menú ${role[0].toUpperCase()}${role.substring(1)}", 
+                    role == 'student' ? "Menu de Estudiante" : "Menú ${role[0].toUpperCase()}${role.substring(1)}",
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: AppTheme.primary,
@@ -138,26 +141,28 @@ class MenuBottomSheet extends StatelessWidget {
           {
             'title': 'ACADÉMICO',
             'items': [
-              {'icon': Icons.badge, 'label': 'Carnet', 'onTap': () {
-                 if (hasData) nav(CarnetScreen(studentData: userData!));
-                 else notImpl();
-              }},
+              {'icon': Icons.grade, 'label': 'Notas', 'onTap': () => nav(const MyGradesScreen())},
               {'icon': Icons.description, 'label': 'Constancias', 'onTap': () {
-                 if (hasData) nav(ConstanciasScreen(studentId: userData!['idEstudiante']));
-                 else notImpl();
+                 if (hasData) {
+                   nav(ConstanciasScreen(studentId: userData!['idEstudiante']));
+                 } else {
+                   notImpl();
+                 }
               }},
               {'icon': Icons.calendar_month, 'label': 'Horario', 'onTap': () {
-                 if (hasData) nav(HorariosScreen(studentId: userData!['idEstudiante']));
-                 else notImpl();
+                 if (hasData) {
+                   nav(HorariosScreen(studentId: userData!['idEstudiante']));
+                 } else {
+                   notImpl();
+                 }
               }},
-              {'icon': Icons.grade, 'label': 'Notas', 'onTap': notImpl}, // Not implemented yet
             ]
           },
           {
             'title': 'COMUNICACIÓN',
             'items': [
-              {'icon': Icons.chat_bubble_outline, 'label': 'Chats', 'onTap': notImpl},
-              {'icon': Icons.newspaper, 'label': 'Noticias', 'onTap': notImpl},
+              {'icon': Icons.chat_bubble_outline, 'label': 'Chats', 'onTap': () => nav(const InboxScreen())},
+              {'icon': Icons.newspaper, 'label': 'Noticias', 'onTap': () => nav(const NoticiasListScreen())},
             ]
           },
           {
@@ -167,10 +172,9 @@ class MenuBottomSheet extends StatelessWidget {
                  if (hasData && userData!['idEstudiante'] != null) {
                     nav(QRScanScreen(studentId: userData!['idEstudiante']));
                  } else {
-                    notImpl(); // Or a custom message asking to login properly
+                    notImpl();
                  }
               }}, 
-              {'icon': Icons.settings, 'label': 'Ajustes', 'onTap': notImpl},
             ]
           }
         ];
@@ -180,20 +184,32 @@ class MenuBottomSheet extends StatelessWidget {
             'title': 'GESTIÓN DE CLASES',
             'items': [
               {'icon': Icons.qr_code_2, 'label': 'Generar QR', 'onTap': () {
-                 if (hasData) nav(GenerateQRScreen(professorId: userData!['idProfesor']));
-                 else notImpl();
+                 if (hasData) {
+                   nav(GenerateQRScreen(professorId: userData!['idProfesor']));
+                 } else {
+                   notImpl();
+                 }
               }},
               {'icon': Icons.assignment_turned_in, 'label': 'Evaluar', 'onTap': () {
-                 if (hasData) nav(NotasScreen(professorId: userData!['idProfesor']));
-                 else notImpl();
+                 if (hasData) {
+                   nav(NotasScreen(professorId: userData!['idProfesor']));
+                 } else {
+                   notImpl();
+                 }
               }},
               {'icon': Icons.list_alt, 'label': 'Asistencia', 'onTap': () {
-                 if (hasData) nav(AsistenciasScreen(professorId: userData!['idProfesor']));
-                 else notImpl();
+                 if (hasData) {
+                   nav(AsistenciasScreen(professorId: userData!['idProfesor']));
+                 } else {
+                   notImpl();
+                 }
               }},
               {'icon': Icons.calendar_today, 'label': 'Horario', 'onTap': () {
-                 if (hasData) nav(HorariosScreen(professorId: userData!['idProfesor']));
-                 else notImpl();
+                 if (hasData) {
+                   nav(HorariosScreen(professorId: userData!['idProfesor']));
+                 } else {
+                   notImpl();
+                 }
               }},
             ]
           },
@@ -227,16 +243,31 @@ class MenuBottomSheet extends StatelessWidget {
            {
             'title': 'CONTROL DE ACCESO',
             'items': [
-               {'icon': Icons.qr_code_scanner, 'label': 'Escanear', 'onTap': notImpl},
-               {'icon': Icons.history, 'label': 'Historial', 'onTap': notImpl},
-               {'icon': Icons.lock_open, 'label': 'Apertura Aulas', 'onTap': notImpl},
+               {'icon': Icons.qr_code_scanner, 'label': 'Escanear', 'onTap': () => nav(const SecurityQRScreen())},
+               {'icon': Icons.history, 'label': 'Historial', 'onTap': () {
+                  // Navigate to history tab in dashboard
+                  Navigator.pop(context);
+                  // We need a way to tell the dashboard to switch tabs,
+                  // or just navigate to a full screen history.
+                  // For now, let's keep it simple or implement a standalone screen.
+                  notImpl();
+               }},
+               {'icon': Icons.lock_open, 'label': 'Apertura Aulas', 'onTap': () => nav(const ClassroomOpeningScreen())},
             ]
            },
            {
-             'title': 'CONFIGURACIÓN',
+             'title': 'SISTEMA',
              'items': [
-               {'icon': Icons.security, 'label': 'Configuración', 'onTap': notImpl},
                {'icon': Icons.report_problem, 'label': 'Reportes', 'onTap': notImpl},
+               {'icon': Icons.info_outline, 'label': 'Estado API', 'onTap': () async {
+                  final ok = await ApiService().getHealth();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(ok ? "Servidor Conectado" : "Servidor No Disponible"),
+                      backgroundColor: ok ? Colors.green : Colors.red,
+                    ));
+                  }
+               }},
              ]
            }
         ];
@@ -253,10 +284,10 @@ class MenuBottomSheet extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.withOpacity(0.2)),
+          border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
           boxShadow: [
              BoxShadow(
-               color: Colors.black.withOpacity(0.02),
+               color: Colors.black.withValues(alpha: 0.02),
                blurRadius: 5,
                offset: const Offset(0, 2),
              )

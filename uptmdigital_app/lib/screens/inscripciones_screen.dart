@@ -69,7 +69,7 @@ class _InscripcionesScreenState extends State<InscripcionesScreen> {
                                 MaterialPageRoute(
                                   builder: (_) => ChatScreen(
                                     asignaturaId: item.asignaturaId,
-                                    asignaturaNombre: "Asignatura ${item.asignaturaId}",
+                                    title: "Asignatura ${item.asignaturaId}",
                                     userName: "Estudiante", // Simplified
                                   ),
                                 ),

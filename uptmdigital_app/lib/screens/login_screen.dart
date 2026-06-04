@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
-import 'dart:ui';
 import 'package:google_fonts/google_fonts.dart'; // Add this
 import 'package:uptmdigital_app/services/api_service.dart';
 
-import 'package:uptmdigital_app/screens/estudiantes_screen.dart';
 import 'package:uptmdigital_app/screens/admin_dashboard.dart';
 import 'package:uptmdigital_app/screens/professor_dashboard.dart';
 import 'package:uptmdigital_app/screens/security_dashboard.dart';
 import 'package:uptmdigital_app/screens/student_dashboard.dart';
 import 'package:uptmdigital_app/screens/register_screen.dart';
+import 'package:uptmdigital_app/screens/secretaria_dashboard.dart';
+import 'package:uptmdigital_app/screens/auditor_dashboard.dart';
+import 'package:uptmdigital_app/screens/coordinator_dashboard.dart';
 import 'package:uptmdigital_app/theme.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -18,8 +19,8 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
-  final _usuarioCtrl = TextEditingController(text: "admin");
-  final _passCtrl = TextEditingController(text: "admin123");
+  final _usuarioCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
   bool _loading = false;
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
@@ -106,7 +107,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                         borderRadius: BorderRadius.circular(24),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
+                            color: Colors.black.withValues(alpha: 0.05),
                             blurRadius: 20,
                             spreadRadius: 5,
                             offset: const Offset(0, 10),
@@ -278,6 +279,15 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       switch (role) {
         case 'Administrador':
           nextScreen = const AdminDashboard();
+          break;
+        case 'Secretaria':
+          nextScreen = const SecretariaDashboard();
+          break;
+        case 'Auditor':
+          nextScreen = const AuditorDashboard();
+          break;
+        case 'Coordinador':
+          nextScreen = const CoordinatorDashboard();
           break;
         case 'Profesor':
           nextScreen = const ProfessorDashboard();

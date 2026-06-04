@@ -26,5 +26,22 @@ namespace UPTMDigital.API.Models
         /// para mostrar rápido sin JOIN y mantener historial si el usuario cambia nombre).
         /// </summary>
         public string EmisorNombre { get; set; } = null!;
+
+        // --- Nuevos Campos Fase 6 ---
+
+        // Tipo: Asignatura, Seccion, Privado, Carrera
+        public string TipoChat { get; set; } = "Asignatura";
+
+        // Para chats de sección o carrera
+        public int? CarreraId { get; set; }
+        [ForeignKey("CarreraId")]
+        public Carrera? Carrera { get; set; }
+
+        public string? Seccion { get; set; }
+
+        // Para chats privados (receptor)
+        public int? ReceptorUsuarioId { get; set; }
+        [ForeignKey("ReceptorUsuarioId")]
+        public Usuario? Receptor { get; set; }
     }
 }

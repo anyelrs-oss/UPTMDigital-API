@@ -20,6 +20,24 @@ namespace UPTMDigital.API.Models
         /// <summary>Nombre del autor (cache para mostrar sin JOIN).</summary>
         public string? Autor { get; set; }
 
+        // --- Nuevos Campos Fase 6 (Cartelera Jerárquica) ---
+
+        // Si es null, va dirigido a todos
+        public int? CarreraId { get; set; }
+        [ForeignKey("CarreraId")]
+        public Carrera? Carrera { get; set; }
+
+        // Si es null, va dirigido a todos los roles
+        public int? RolId { get; set; }
+        [ForeignKey("RolId")]
+        public Rol? Rol { get; set; }
+
+        // Prioridad: Normal, Urgente, Critica
+        public string Prioridad { get; set; } = "Normal";
+
+        // Trimestre dirigido (Opcional)
+        public string? Trimestre { get; set; }
+
         public bool Activo { get; set; } = true;
     }
 }

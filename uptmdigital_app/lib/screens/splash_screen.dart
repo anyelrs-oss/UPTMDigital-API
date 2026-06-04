@@ -4,6 +4,9 @@ import 'package:uptmdigital_app/screens/student_dashboard.dart';
 import 'package:uptmdigital_app/screens/professor_dashboard.dart';
 import 'package:uptmdigital_app/screens/admin_dashboard.dart';
 import 'package:uptmdigital_app/screens/security_dashboard.dart';
+import 'package:uptmdigital_app/screens/secretaria_dashboard.dart';
+import 'package:uptmdigital_app/screens/auditor_dashboard.dart';
+import 'package:uptmdigital_app/screens/coordinator_dashboard.dart';
 import 'package:uptmdigital_app/services/api_service.dart';
 import 'package:uptmdigital_app/theme.dart';
 
@@ -47,13 +50,18 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _checkAuthAndNavigate() async {
-    // Espera mínima para mostrar el splash
-    await Future.delayed(const Duration(milliseconds: 1800));
-
-    if (!mounted) return;
+    // Reducimos la espera mínima para que la app se sienta más rápida
+    final minWait = Future.delayed(const Duration(milliseconds: 800));
 
     final api = ApiService();
-    final loggedIn = await api.isLoggedIn();
+    // Iniciamos la verificación de auth en paralelo con la animación/espera
+    final loggedInFuture = api.isLoggedIn();
+
+    // Esperamos a ambos
+    await minWait;
+    final loggedIn = await loggedInFuture;
+
+    if (!mounted) return;
 
     if (!loggedIn) {
       _goTo(const LoginScreen());
@@ -70,6 +78,15 @@ class _SplashScreenState extends State<SplashScreen>
         break;
       case 'Administrador':
         destination = const AdminDashboard();
+        break;
+      case 'Secretaria':
+        destination = const SecretariaDashboard();
+        break;
+      case 'Auditor':
+        destination = const AuditorDashboard();
+        break;
+      case 'Coordinador':
+        destination = const CoordinatorDashboard();
         break;
       case 'Seguridad':
         destination = const SecurityDashboard();
@@ -112,7 +129,7 @@ class _SplashScreenState extends State<SplashScreen>
                   color: Colors.white,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withValues(alpha: 0.1),
                       blurRadius: 20,
                       spreadRadius: 5,
                     ),

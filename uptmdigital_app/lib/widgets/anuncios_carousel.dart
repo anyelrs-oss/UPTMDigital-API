@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:uptmdigital_app/models/anuncio.dart';
 import 'package:uptmdigital_app/services/api_service.dart';
+import 'package:uptmdigital_app/screens/noticia_detalle_screen.dart';
 
 class AnunciosCarousel extends StatefulWidget {
-  const AnunciosCarousel({Key? key}) : super(key: key);
+  const AnunciosCarousel({super.key});
 
   @override
   State<AnunciosCarousel> createState() => _AnunciosCarouselState();
@@ -46,37 +47,21 @@ class _AnunciosCarouselState extends State<AnunciosCarousel> {
               final anuncio = anuncios[index];
               return GestureDetector(
                 onTap: () {
-                  showDialog(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: Text(anuncio.titulo),
-                      content: SingleChildScrollView(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              anuncio.fechaPublicacion.split('T')[0],
-                              style: const TextStyle(fontSize: 12, color: Colors.grey),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(anuncio.contenido),
-                          ],
-                        ),
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          child: const Text("Cerrar"),
-                        ),
-                      ],
-                    ),
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => NoticiaDetalleScreen(anuncio: anuncio)),
                   );
                 },
                 child: Container(
                   margin: const EdgeInsets.symmetric(horizontal: 5.0, vertical: 10),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [Colors.blue, Colors.lightBlueAccent]),
+                    gradient: LinearGradient(
+                      colors: anuncio.prioridad == "Critica"
+                        ? [Colors.red.shade700, Colors.red.shade400]
+                        : anuncio.prioridad == "Urgente"
+                          ? [Colors.orange.shade700, Colors.orange.shade400]
+                          : [Colors.blue, Colors.lightBlueAccent]
+                    ),
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 5, offset: Offset(0, 5))],
                   ),

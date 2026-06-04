@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:uptmdigital_app/services/api_service.dart';
-import 'package:uptmdigital_app/theme.dart';
 import 'package:uptmdigital_app/widgets/search_filter_bar.dart';
+import 'dart:convert';
 
 class UsuariosScreen extends StatefulWidget {
   const UsuariosScreen({super.key});
@@ -27,7 +27,25 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
 
   Future<void> _loadUsuarios() async {
     setState(() => _isLoading = true);
-    final data = await ApiService().getUsuarios();
+    final api = ApiService();
+
+    // 1. Cargar de caché (solo primera carga sin filtros)
+    if (_searchQuery.isEmpty && _selectedRol == null) {
+      final cached = await api.storage.read(key: 'cached_usuarios_list');
+      if (cached != null && mounted) {
+        setState(() {
+          _allUsuarios = jsonDecode(cached);
+          _applyFilters();
+          _isLoading = false;
+        });
+      }
+    }
+
+    // 2. Cargar de red
+    final data = await api.getUsuarios(
+      search: _searchQuery.isEmpty ? null : _searchQuery,
+      rol: _selectedRol,
+    );
     if (mounted) {
       setState(() {
         _allUsuarios = data;
@@ -124,6 +142,9 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
     final activo = u['activo'] == true;
     final estadoCuenta = u['estadoCuenta'] == true;
 
+    // Color basado en el estado de la cuenta (Habilitado/Bloqueado)
+    final Color statusColor = estadoCuenta ? Colors.green : Colors.grey;
+
     return Card(
       elevation: 2,
       child: Padding(
@@ -132,7 +153,7 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
           children: [
             CircleAvatar(
               radius: 24,
-              backgroundColor: _rolColor(rol).withOpacity(0.15),
+              backgroundColor: _rolColor(rol).withValues(alpha: 0.15),
               child: Icon(
                 rol == 'Seguridad' ? Icons.security :
                 rol == 'Profesor' ? Icons.school :
@@ -157,7 +178,7 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: _rolColor(rol).withOpacity(0.1),
+                          color: _rolColor(rol).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(rol, style: TextStyle(fontSize: 11, color: _rolColor(rol), fontWeight: FontWeight.bold)),
@@ -173,9 +194,12 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
                       const SizedBox(width: 4),
                       Text(activo ? "Activo" : "Inactivo", style: TextStyle(fontSize: 11, color: activo ? Colors.green : Colors.red)),
                       const SizedBox(width: 12),
-                      Icon(estadoCuenta ? Icons.lock_open : Icons.lock, size: 14, color: Colors.grey),
+                      Icon(estadoCuenta ? Icons.lock_open : Icons.lock, size: 14, color: statusColor),
                       const SizedBox(width: 4),
-                      Text(estadoCuenta ? "Habilitado" : "Bloqueado", style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+                      Text(
+                        estadoCuenta ? "Habilitado" : "Bloqueado",
+                        style: TextStyle(fontSize: 11, color: statusColor, fontWeight: FontWeight.bold),
+                      ),
                     ],
                   ),
                 ],
@@ -184,9 +208,26 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
             PopupMenuButton<String>(
               onSelected: (action) => _handleAction(action, u),
               itemBuilder: (ctx) => [
-                const PopupMenuItem(value: 'toggle', child: Text("Activar/Desactivar")),
-                const PopupMenuItem(value: 'reset', child: Text("Reset Contraseña")),
-                const PopupMenuItem(value: 'delete', child: Text("Eliminar", style: TextStyle(color: Colors.red))),
+                PopupMenuItem(
+                  value: 'toggle',
+                  child: Row(
+                    children: [
+                      Icon(estadoCuenta ? Icons.block : Icons.check_circle, color: estadoCuenta ? Colors.orange : Colors.green, size: 20),
+                      const SizedBox(width: 8),
+                      Text(estadoCuenta ? "Bloquear Usuario" : "Habilitar Usuario"),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'reset',
+                  child: Row(
+                    children: [
+                      Icon(Icons.password, color: Colors.blue, size: 20),
+                      const SizedBox(width: 8),
+                      Text("Nueva Contraseña"),
+                    ],
+                  ),
+                ),
               ],
             ),
           ],
@@ -200,45 +241,86 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
 
     if (action == 'toggle') {
       final currentState = u['estadoCuenta'] == true;
+
+      // Actualización Optimista: Cambiamos el estado en memoria inmediatamente
+      setState(() {
+        final index = _allUsuarios.indexWhere((element) => element['idUsuario'] == id);
+        if (index != -1) {
+          _allUsuarios[index]['estadoCuenta'] = !currentState;
+          _applyFilters();
+        }
+      });
+
       final success = await ApiService().updateUsuario(id, {'estadoCuenta': !currentState});
-      if (success) {
-        _loadUsuarios();
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(currentState ? "Usuario bloqueado" : "Usuario habilitado")));
+
+      if (!success) {
+        // Si falla, revertimos el cambio
+        setState(() {
+          final index = _allUsuarios.indexWhere((element) => element['idUsuario'] == id);
+          if (index != -1) {
+            _allUsuarios[index]['estadoCuenta'] = currentState;
+            _applyFilters();
+          }
+        });
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Error al actualizar usuario"), backgroundColor: Colors.red));
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(!currentState ? "Usuario habilitado con éxito" : "Usuario bloqueado con éxito"),
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        }
       }
     } else if (action == 'reset') {
       final ctrl = TextEditingController();
+      bool obscure = true;
+
       final result = await showDialog<bool>(
         context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text("Reset Contraseña"),
-          content: TextField(controller: ctrl, decoration: const InputDecoration(labelText: "Nueva Contraseña"), obscureText: true),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancelar")),
-            ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("Cambiar")),
-          ],
+        builder: (ctx) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text("Nueva Contraseña"),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text("Ingresa la nueva clave para ${u['nombreUsuario']}:"),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: ctrl,
+                  obscureText: obscure,
+                  decoration: InputDecoration(
+                    labelText: "Contraseña",
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscure ? Icons.visibility : Icons.visibility_off),
+                      onPressed: () => setDialogState(() => obscure = !obscure),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("CANCELAR")),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
+                child: const Text("GUARDAR"),
+              ),
+            ],
+          ),
         ),
       );
+
       if (result == true && ctrl.text.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Procesando cambio...")));
         final success = await ApiService().resetPasswordUsuario(id, ctrl.text);
         if (success && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Contraseña restablecida")));
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("¡Contraseña actualizada correctamente!", backgroundColor: Colors.green)));
+        } else if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Error al cambiar contraseña"), backgroundColor: Colors.red));
         }
-      }
-    } else if (action == 'delete') {
-      final confirm = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text("Desactivar Usuario"),
-          content: Text("¿Desactivar a ${u['nombreUsuario']}?"),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancelar")),
-            TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("Desactivar", style: TextStyle(color: Colors.red))),
-          ],
-        ),
-      );
-      if (confirm == true) {
-        await ApiService().deleteUsuario(id);
-        _loadUsuarios();
       }
     }
   }

@@ -19,12 +19,40 @@ namespace UPTMDigital.API.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Nota>>> GetNotas()
+        public async Task<IActionResult> GetNotas([FromQuery] string? search, [FromQuery] int? asignaturaId)
         {
-            return await _context.Notas
+            var query = _context.Notas
                 .Include(n => n.Estudiante)
                 .Include(n => n.Asignatura)
+                .AsQueryable();
+
+            if (asignaturaId.HasValue)
+                query = query.Where(n => n.AsignaturaId == asignaturaId.Value);
+
+            if (!string.IsNullOrEmpty(search))
+            {
+                query = query.Where(n =>
+                    n.Estudiante.Cedula.Contains(search) ||
+                    n.Estudiante.Nombres.Contains(search) ||
+                    n.Estudiante.Apellidos.Contains(search));
+            }
+
+            var notas = await query
+                .OrderByDescending(n => n.Fecha)
+                .Select(n => new {
+                    n.IdNota,
+                    n.AsignaturaId,
+                    asignaturaNombre = n.Asignatura.Nombre,
+                    n.EstudianteId,
+                    estudianteNombre = n.Estudiante.Nombres + " " + n.Estudiante.Apellidos,
+                    estudianteCedula = n.Estudiante.Cedula,
+                    n.Calificacion,
+                    n.Fecha
+                    // REMOVED: audit query was causing N+1. Access audit logs via separate endpoint if needed.
+                })
                 .ToListAsync();
+
+            return Ok(notas);
         }
 
         [HttpGet("{id}")]

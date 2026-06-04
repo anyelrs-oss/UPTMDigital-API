@@ -5,7 +5,7 @@ import 'package:uptmdigital_app/services/api_service.dart';
 
 class QRScanScreen extends StatefulWidget {
   final int studentId;
-  const QRScanScreen({Key? key, required this.studentId}) : super(key: key);
+  const QRScanScreen({super.key, required this.studentId});
 
   @override
   State<QRScanScreen> createState() => _QRScanScreenState();

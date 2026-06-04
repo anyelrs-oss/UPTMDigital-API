@@ -1,22 +1,50 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'dart:convert';
-import 'package:uptmdigital_app/theme.dart';
 
-class CarnetScreen extends StatelessWidget {
+class CarnetScreen extends StatefulWidget {
   final Map<String, dynamic> studentData;
 
-  const CarnetScreen({Key? key, required this.studentData}) : super(key: key);
+  const CarnetScreen({super.key, required this.studentData});
+
+  @override
+  State<CarnetScreen> createState() => _CarnetScreenState();
+}
+
+class _CarnetScreenState extends State<CarnetScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Fase 8: Bloquear capturas de pantalla para seguridad del carnet
+    _enableSecurity();
+  }
+
+  @override
+  void dispose() {
+    _disableSecurity();
+    super.dispose();
+  }
+
+  Future<void> _enableSecurity() async {
+    // Solo funciona en Android nativo, pero preparamos el llamado
+    await SystemChannels.platform.invokeMethod('SystemChrome.setEnabledSystemUIMode', []);
+  }
+
+  Future<void> _disableSecurity() async {
+    // Restaurar permisos de captura al salir
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Generate QR Data: JSON with student identification
-    // We include timestamp to allow future validation of "recency" if we want dynamic codes later
+    final bool esSolvente = widget.studentData['estadoArancel'] ?? true;
+
     final qrData = jsonEncode({
-      "id": studentData['idEstudiante'],
-      "cedula": studentData['cedula'],
+      "id": widget.studentData['idEstudiante'],
+      "cedula": widget.studentData['cedula'],
       "role": "Estudiante",
-      "generated_at": DateTime.now().toIso8601String(), 
+      "solvente": esSolvente,
+      "generated_at": DateTime.now().toIso8601String(),
     });
 
     return Scaffold(
@@ -26,7 +54,7 @@ class CarnetScreen extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Use a Container to simulate the physical card
+              // Contenedor del Carnet
               Container(
                 width: 350,
                 height: 550,
@@ -35,36 +63,41 @@ class CarnetScreen extends StatelessWidget {
                   gradient: const LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [Color(0xFF1A237E), Color(0xFF3949AB)]), // Professional Blue Gradient
+                      colors: [Color(0xFF1A237E), Color(0xFF3949AB)]),
                   boxShadow: const [
                     BoxShadow(color: Colors.black26, blurRadius: 15, offset: Offset(0, 10))
                   ],
                 ),
                 child: Stack(
                   children: [
-                    // Background Pattern (Optional opacity)
-                    Positioned.fill(
-                      child: Opacity(
-                        opacity: 0.1,
-                        child: Image.network(
-                          "https://www.transparenttextures.com/patterns/cubes.png", // Placeholder pattern
-                          repeat: ImageRepeat.repeat,
-                          errorBuilder: (_,__,___) => const SizedBox(), 
+                    // Fase 8: Marca de agua de solvencia
+                    if (!esSolvente)
+                      Positioned.fill(
+                        child: Container(
+                          decoration: BoxDecoration(borderRadius: BorderRadius.circular(20)),
+                          child: Center(
+                            child: Transform.rotate(
+                              angle: -0.5,
+                              child: Text(
+                                "PENDIENTE POR ARANCEL",
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.15),
+                                  fontSize: 40,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+
                     Column(
                       children: [
                         const SizedBox(height: 30),
-                        // University Header
                         const Text(
                           "UPTM DIGITAL",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 2,
-                          ),
+                          style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 2),
                         ),
                         const SizedBox(height: 5),
                         const Text(
@@ -73,46 +106,38 @@ class CarnetScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 20),
                         
-                        // Photo
+                        // Foto
                         Container(
                           padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                          ),
+                          decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
                           child: CircleAvatar(
                             radius: 60,
-                            backgroundImage: studentData['fotoUrl'] != null 
-                                ? NetworkImage(studentData['fotoUrl']) 
+                            backgroundImage: widget.studentData['fotoUrl'] != null
+                                ? NetworkImage(widget.studentData['fotoUrl'])
                                 : const NetworkImage('https://i.pravatar.cc/300'),
                           ),
                         ),
                         
                         const SizedBox(height: 20),
-                        // Name & Info
                         Text(
-                          "${studentData['nombres']} ${studentData['apellidos']}",
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          "${widget.studentData['nombres']} ${widget.studentData['apellidos']}",
+                          style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 5),
                         Text(
-                          "C.I: ${studentData['cedula']}",
+                          "C.I: ${widget.studentData['cedula']}",
                           style: const TextStyle(color: Colors.white70, fontSize: 16),
                         ),
                         const SizedBox(height: 15),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
-                            color: Colors.white24,
+                            color: esSolvente ? Colors.white24 : Colors.red.withValues(alpha: 0.4),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            studentData['carrera'] ?? 'ESTUDIANTE',
+                            esSolvente ? (widget.studentData['carrera'] ?? 'ESTUDIANTE') : "SOLVENCIA PENDIENTE",
                             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
                           ),
                         ),
@@ -120,22 +145,24 @@ class CarnetScreen extends StatelessWidget {
                         const Spacer(),
                         
                         // QR Code
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: QrImageView(
-                            data: qrData,
-                            version: QrVersions.auto,
-                            size: 120.0,
+                        GestureDetector(
+                          onTap: () => _showZoomedQR(context, qrData),
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+                            child: QrImageView(
+                              data: qrData,
+                              version: QrVersions.auto,
+                              size: 120.0,
+                              eyeStyle: QrEyeStyle(eyeShape: QrEyeShape.square, color: esSolvente ? Colors.black : Colors.grey),
+                              dataModuleStyle: QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: esSolvente ? Colors.black : Colors.grey),
+                            ),
                           ),
                         ),
                         const SizedBox(height: 10),
-                        Text(
-                          "Válido hasta: Dic 2025", // Hardcoded period for now
-                          style: const TextStyle(color: Colors.white54, fontSize: 12),
+                        const Text(
+                          "Válido hasta: Dic 2025",
+                          style: TextStyle(color: Colors.white54, fontSize: 12),
                         ),
                         const SizedBox(height: 30),
                       ],
@@ -144,10 +171,37 @@ class CarnetScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 20),
-              const Text(
-                "Presente este código para ingresar",
-                style: TextStyle(color: Colors.grey),
+              Text(
+                esSolvente ? "Presente este código para ingresar" : "Acuda a Secretaría para solventar arancel",
+                style: TextStyle(color: esSolvente ? Colors.grey : Colors.red),
               )
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showZoomedQR(BuildContext context, String data) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text("Escaneando Identidad", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              const SizedBox(height: 20),
+              QrImageView(
+                data: data,
+                version: QrVersions.auto,
+                size: 280.0,
+              ),
+              const SizedBox(height: 20),
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("CERRAR")),
             ],
           ),
         ),

@@ -30,8 +30,14 @@ namespace UPTMDigital.API.Migrations.UPTMDigital
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("IdAnuncio"));
 
+                    b.Property<bool>("Activo")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Autor")
                         .HasColumnType("text");
+
+                    b.Property<int?>("CarreraId")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Contenido")
                         .IsRequired()
@@ -40,13 +46,62 @@ namespace UPTMDigital.API.Migrations.UPTMDigital
                     b.Property<DateTime>("FechaPublicacion")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("Prioridad")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int?>("RolId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Titulo")
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<int?>("UsuarioId")
+                        .HasColumnType("integer");
+
                     b.HasKey("IdAnuncio");
 
+                    b.HasIndex("CarreraId");
+
+                    b.HasIndex("RolId");
+
+                    b.HasIndex("UsuarioId");
+
                     b.ToTable("Anuncio");
+                });
+
+            modelBuilder.Entity("UPTMDigital.API.Models.ArancelValidacion", b =>
+                {
+                    b.Property<int>("IdValidacion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("IdValidacion"));
+
+                    b.Property<string>("CedulaEstudiante")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("FechaValidacion")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("MetodoPago")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("NumeroFactura")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int?>("SecretariaId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("IdValidacion");
+
+                    b.HasIndex("SecretariaId");
+
+                    b.ToTable("ArancelValidacion");
                 });
 
             modelBuilder.Entity("UPTMDigital.API.Models.Asignatura", b =>
@@ -56,6 +111,12 @@ namespace UPTMDigital.API.Migrations.UPTMDigital
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("IdAsignatura"));
+
+                    b.Property<bool>("Activo")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("CarreraId")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Codigo")
                         .IsRequired()
@@ -74,12 +135,16 @@ namespace UPTMDigital.API.Migrations.UPTMDigital
                     b.Property<int?>("ProfesorId")
                         .HasColumnType("integer");
 
-                    b.Property<int?>("Semestre")
+                    b.Property<int?>("SemestreId")
                         .HasColumnType("integer");
 
                     b.HasKey("IdAsignatura");
 
+                    b.HasIndex("CarreraId");
+
                     b.HasIndex("ProfesorId");
+
+                    b.HasIndex("SemestreId");
 
                     b.ToTable("Asignatura");
                 });
@@ -120,6 +185,85 @@ namespace UPTMDigital.API.Migrations.UPTMDigital
                     b.HasIndex("ProfesorId");
 
                     b.ToTable("Asistencia");
+                });
+
+            modelBuilder.Entity("UPTMDigital.API.Models.AuditLog", b =>
+                {
+                    b.Property<int>("IdAudit")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("IdAudit"));
+
+                    b.Property<string>("Accion")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Detalles")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("Fecha")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("IP")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("MotivoJustificado")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Ruta")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int?>("UsuarioId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("IdAudit");
+
+                    b.HasIndex("UsuarioId");
+
+                    b.ToTable("AuditLog");
+                });
+
+            modelBuilder.Entity("UPTMDigital.API.Models.Aula", b =>
+                {
+                    b.Property<int>("IdAula")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("IdAula"));
+
+                    b.Property<bool>("Activo")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Edificio")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Estado")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("HoraApertura")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Piso")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int?>("ProfesorActualId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("IdAula");
+
+                    b.HasIndex("ProfesorActualId");
+
+                    b.ToTable("Aula");
                 });
 
             modelBuilder.Entity("UPTMDigital.API.Models.Carrera", b =>
@@ -201,9 +345,42 @@ namespace UPTMDigital.API.Migrations.UPTMDigital
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<int?>("UsuarioId")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
+                    b.HasIndex("PersonalSeguridadId");
+
+                    b.HasIndex("UsuarioId");
+
                     b.ToTable("ControlAcceso");
+                });
+
+            modelBuilder.Entity("UPTMDigital.API.Models.Coordinador", b =>
+                {
+                    b.Property<int>("IdCoordinador")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("IdCoordinador"));
+
+                    b.Property<bool>("Activo")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("CarreraId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("UsuarioId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("IdCoordinador");
+
+                    b.HasIndex("CarreraId");
+
+                    b.HasIndex("UsuarioId");
+
+                    b.ToTable("Coordinador");
                 });
 
             modelBuilder.Entity("UPTMDigital.API.Models.Estudiante", b =>
@@ -214,12 +391,15 @@ namespace UPTMDigital.API.Migrations.UPTMDigital
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("IdEstudiante"));
 
+                    b.Property<bool>("Activo")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Apellidos")
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("Carrera")
-                        .HasColumnType("text");
+                    b.Property<int?>("CarreraId")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Cedula")
                         .IsRequired()
@@ -228,14 +408,14 @@ namespace UPTMDigital.API.Migrations.UPTMDigital
                     b.Property<string>("CodAlumno")
                         .HasColumnType("text");
 
-                    b.Property<string>("CodCarrera")
-                        .HasColumnType("text");
-
                     b.Property<string>("CorreoInstitucional")
                         .HasColumnType("text");
 
                     b.Property<string>("Direccion")
                         .HasColumnType("text");
+
+                    b.Property<bool>("EstadoArancel")
+                        .HasColumnType("boolean");
 
                     b.Property<DateTime?>("FechaRegistro")
                         .HasColumnType("timestamp with time zone");
@@ -247,12 +427,50 @@ namespace UPTMDigital.API.Migrations.UPTMDigital
                     b.Property<string>("Telefono")
                         .HasColumnType("text");
 
-                    b.Property<string>("UsuarioLogin")
-                        .HasColumnType("text");
+                    b.Property<int?>("UsuarioId")
+                        .HasColumnType("integer");
 
                     b.HasKey("IdEstudiante");
 
+                    b.HasIndex("CarreraId");
+
+                    b.HasIndex("Cedula")
+                        .IsUnique();
+
+                    b.HasIndex("UsuarioId");
+
                     b.ToTable("Estudiante");
+                });
+
+            modelBuilder.Entity("UPTMDigital.API.Models.EvaluacionConfig", b =>
+                {
+                    b.Property<int>("IdEvaluacion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("IdEvaluacion"));
+
+                    b.Property<bool>("Activo")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("AsignaturaId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("FechaEvaluacion")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("Ponderacion")
+                        .HasColumnType("numeric");
+
+                    b.HasKey("IdEvaluacion");
+
+                    b.HasIndex("AsignaturaId");
+
+                    b.ToTable("EvaluacionConfig");
                 });
 
             modelBuilder.Entity("UPTMDigital.API.Models.Horario", b =>
@@ -309,15 +527,16 @@ namespace UPTMDigital.API.Migrations.UPTMDigital
                     b.Property<DateTime?>("FechaInscripcion")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("Periodo")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<int?>("PeriodoId")
+                        .HasColumnType("integer");
 
                     b.HasKey("IdInscripcion");
 
                     b.HasIndex("AsignaturaId");
 
                     b.HasIndex("EstudianteId");
+
+                    b.HasIndex("PeriodoId");
 
                     b.ToTable("Inscripcion");
                 });
@@ -344,7 +563,26 @@ namespace UPTMDigital.API.Migrations.UPTMDigital
                     b.Property<DateTime>("FechaEnvio")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int?>("ReceptorUsuarioId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Seccion")
+                        .HasColumnType("text");
+
+                    b.Property<string>("TipoChat")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("UsuarioId")
+                        .HasColumnType("integer");
+
                     b.HasKey("IdMensaje");
+
+                    b.HasIndex("AsignaturaId");
+
+                    b.HasIndex("ReceptorUsuarioId");
+
+                    b.HasIndex("UsuarioId");
 
                     b.ToTable("Mensaje");
                 });
@@ -398,10 +636,6 @@ namespace UPTMDigital.API.Migrations.UPTMDigital
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("DestinatarioLogin")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<DateTime>("FechaCreacion")
                         .HasColumnType("timestamp with time zone");
 
@@ -416,7 +650,12 @@ namespace UPTMDigital.API.Migrations.UPTMDigital
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<int>("UsuarioId")
+                        .HasColumnType("integer");
+
                     b.HasKey("IdNotificacion");
+
+                    b.HasIndex("UsuarioId");
 
                     b.ToTable("Notificacion");
                 });
@@ -441,6 +680,34 @@ namespace UPTMDigital.API.Migrations.UPTMDigital
                     b.ToTable("Periodo");
                 });
 
+            modelBuilder.Entity("UPTMDigital.API.Models.PinAsistencia", b =>
+                {
+                    b.Property<int>("IdPin")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("IdPin"));
+
+                    b.Property<bool>("Activo")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("CoordinadorId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("FechaExpiracion")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Pin")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("IdPin");
+
+                    b.HasIndex("CoordinadorId");
+
+                    b.ToTable("PinAsistencia");
+                });
+
             modelBuilder.Entity("UPTMDigital.API.Models.Profesor", b =>
                 {
                     b.Property<int>("IdProfesor")
@@ -448,6 +715,9 @@ namespace UPTMDigital.API.Migrations.UPTMDigital
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("IdProfesor"));
+
+                    b.Property<bool>("Activo")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Apellidos")
                         .IsRequired()
@@ -473,10 +743,12 @@ namespace UPTMDigital.API.Migrations.UPTMDigital
                     b.Property<string>("Telefono")
                         .HasColumnType("text");
 
-                    b.Property<string>("UsuarioLogin")
-                        .HasColumnType("text");
+                    b.Property<int?>("UsuarioId")
+                        .HasColumnType("integer");
 
                     b.HasKey("IdProfesor");
+
+                    b.HasIndex("UsuarioId");
 
                     b.ToTable("Profesor");
                 });
@@ -552,6 +824,50 @@ namespace UPTMDigital.API.Migrations.UPTMDigital
                     b.ToTable("Semestre");
                 });
 
+            modelBuilder.Entity("UPTMDigital.API.Models.SolicitudApertura", b =>
+                {
+                    b.Property<int>("IdSolicitud")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("IdSolicitud"));
+
+                    b.Property<int>("AulaId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Estado")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("FechaAtencion")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("FechaCompletada")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("FechaSolicitud")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Motivo")
+                        .HasColumnType("text");
+
+                    b.Property<int?>("PersonalSeguridadId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ProfesorId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("IdSolicitud");
+
+                    b.HasIndex("AulaId");
+
+                    b.HasIndex("PersonalSeguridadId");
+
+                    b.HasIndex("ProfesorId");
+
+                    b.ToTable("SolicitudApertura");
+                });
+
             modelBuilder.Entity("UPTMDigital.API.Models.Usuario", b =>
                 {
                     b.Property<int>("IdUsuario")
@@ -559,6 +875,9 @@ namespace UPTMDigital.API.Migrations.UPTMDigital
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("IdUsuario"));
+
+                    b.Property<bool>("Activo")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Cedula")
                         .HasColumnType("text");
@@ -574,6 +893,9 @@ namespace UPTMDigital.API.Migrations.UPTMDigital
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<int?>("RegistroInstitucionalId")
+                        .HasColumnType("integer");
+
                     b.Property<int>("RolId")
                         .HasColumnType("integer");
 
@@ -582,18 +904,63 @@ namespace UPTMDigital.API.Migrations.UPTMDigital
 
                     b.HasKey("IdUsuario");
 
+                    b.HasIndex("RegistroInstitucionalId");
+
                     b.HasIndex("RolId");
 
                     b.ToTable("Usuario");
                 });
 
+            modelBuilder.Entity("UPTMDigital.API.Models.Anuncio", b =>
+                {
+                    b.HasOne("UPTMDigital.API.Models.Carrera", "Carrera")
+                        .WithMany()
+                        .HasForeignKey("CarreraId");
+
+                    b.HasOne("UPTMDigital.API.Models.Rol", "Rol")
+                        .WithMany()
+                        .HasForeignKey("RolId");
+
+                    b.HasOne("UPTMDigital.API.Models.Usuario", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Carrera");
+
+                    b.Navigation("Rol");
+
+                    b.Navigation("Usuario");
+                });
+
+            modelBuilder.Entity("UPTMDigital.API.Models.ArancelValidacion", b =>
+                {
+                    b.HasOne("UPTMDigital.API.Models.Usuario", "Secretaria")
+                        .WithMany()
+                        .HasForeignKey("SecretariaId");
+
+                    b.Navigation("Secretaria");
+                });
+
             modelBuilder.Entity("UPTMDigital.API.Models.Asignatura", b =>
                 {
+                    b.HasOne("UPTMDigital.API.Models.Carrera", "Carrera")
+                        .WithMany()
+                        .HasForeignKey("CarreraId");
+
                     b.HasOne("UPTMDigital.API.Models.Profesor", "Profesor")
                         .WithMany()
                         .HasForeignKey("ProfesorId");
 
+                    b.HasOne("UPTMDigital.API.Models.Semestre", "Semestre")
+                        .WithMany()
+                        .HasForeignKey("SemestreId");
+
+                    b.Navigation("Carrera");
+
                     b.Navigation("Profesor");
+
+                    b.Navigation("Semestre");
                 });
 
             modelBuilder.Entity("UPTMDigital.API.Models.Asistencia", b =>
@@ -621,6 +988,24 @@ namespace UPTMDigital.API.Migrations.UPTMDigital
                     b.Navigation("Profesor");
                 });
 
+            modelBuilder.Entity("UPTMDigital.API.Models.AuditLog", b =>
+                {
+                    b.HasOne("UPTMDigital.API.Models.Usuario", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId");
+
+                    b.Navigation("Usuario");
+                });
+
+            modelBuilder.Entity("UPTMDigital.API.Models.Aula", b =>
+                {
+                    b.HasOne("UPTMDigital.API.Models.Profesor", "ProfesorActual")
+                        .WithMany()
+                        .HasForeignKey("ProfesorActualId");
+
+                    b.Navigation("ProfesorActual");
+                });
+
             modelBuilder.Entity("UPTMDigital.API.Models.Constancia", b =>
                 {
                     b.HasOne("UPTMDigital.API.Models.Estudiante", "Estudiante")
@@ -630,6 +1015,66 @@ namespace UPTMDigital.API.Migrations.UPTMDigital
                         .IsRequired();
 
                     b.Navigation("Estudiante");
+                });
+
+            modelBuilder.Entity("UPTMDigital.API.Models.ControlAcceso", b =>
+                {
+                    b.HasOne("UPTMDigital.API.Models.Usuario", "PersonalSeguridad")
+                        .WithMany()
+                        .HasForeignKey("PersonalSeguridadId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("UPTMDigital.API.Models.Usuario", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("PersonalSeguridad");
+
+                    b.Navigation("Usuario");
+                });
+
+            modelBuilder.Entity("UPTMDigital.API.Models.Coordinador", b =>
+                {
+                    b.HasOne("UPTMDigital.API.Models.Carrera", "Carrera")
+                        .WithMany()
+                        .HasForeignKey("CarreraId");
+
+                    b.HasOne("UPTMDigital.API.Models.Usuario", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Carrera");
+
+                    b.Navigation("Usuario");
+                });
+
+            modelBuilder.Entity("UPTMDigital.API.Models.Estudiante", b =>
+                {
+                    b.HasOne("UPTMDigital.API.Models.Carrera", "Carrera")
+                        .WithMany()
+                        .HasForeignKey("CarreraId");
+
+                    b.HasOne("UPTMDigital.API.Models.Usuario", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId");
+
+                    b.Navigation("Carrera");
+
+                    b.Navigation("Usuario");
+                });
+
+            modelBuilder.Entity("UPTMDigital.API.Models.EvaluacionConfig", b =>
+                {
+                    b.HasOne("UPTMDigital.API.Models.Asignatura", "Asignatura")
+                        .WithMany()
+                        .HasForeignKey("AsignaturaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Asignatura");
                 });
 
             modelBuilder.Entity("UPTMDigital.API.Models.Horario", b =>
@@ -657,9 +1102,40 @@ namespace UPTMDigital.API.Migrations.UPTMDigital
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("UPTMDigital.API.Models.Periodo", "Periodo")
+                        .WithMany()
+                        .HasForeignKey("PeriodoId");
+
                     b.Navigation("Asignatura");
 
                     b.Navigation("Estudiante");
+
+                    b.Navigation("Periodo");
+                });
+
+            modelBuilder.Entity("UPTMDigital.API.Models.Mensaje", b =>
+                {
+                    b.HasOne("UPTMDigital.API.Models.Asignatura", "Asignatura")
+                        .WithMany()
+                        .HasForeignKey("AsignaturaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("UPTMDigital.API.Models.Usuario", "Receptor")
+                        .WithMany()
+                        .HasForeignKey("ReceptorUsuarioId");
+
+                    b.HasOne("UPTMDigital.API.Models.Usuario", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Asignatura");
+
+                    b.Navigation("Receptor");
+
+                    b.Navigation("Usuario");
                 });
 
             modelBuilder.Entity("UPTMDigital.API.Models.Nota", b =>
@@ -687,13 +1163,76 @@ namespace UPTMDigital.API.Migrations.UPTMDigital
                     b.Navigation("Profesor");
                 });
 
+            modelBuilder.Entity("UPTMDigital.API.Models.Notificacion", b =>
+                {
+                    b.HasOne("UPTMDigital.API.Models.Usuario", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Usuario");
+                });
+
+            modelBuilder.Entity("UPTMDigital.API.Models.PinAsistencia", b =>
+                {
+                    b.HasOne("UPTMDigital.API.Models.Usuario", "Coordinador")
+                        .WithMany()
+                        .HasForeignKey("CoordinadorId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Coordinador");
+                });
+
+            modelBuilder.Entity("UPTMDigital.API.Models.Profesor", b =>
+                {
+                    b.HasOne("UPTMDigital.API.Models.Usuario", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId");
+
+                    b.Navigation("Usuario");
+                });
+
+            modelBuilder.Entity("UPTMDigital.API.Models.SolicitudApertura", b =>
+                {
+                    b.HasOne("UPTMDigital.API.Models.Aula", "Aula")
+                        .WithMany()
+                        .HasForeignKey("AulaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("UPTMDigital.API.Models.Usuario", "PersonalSeguridad")
+                        .WithMany()
+                        .HasForeignKey("PersonalSeguridadId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("UPTMDigital.API.Models.Profesor", "Profesor")
+                        .WithMany()
+                        .HasForeignKey("ProfesorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Aula");
+
+                    b.Navigation("PersonalSeguridad");
+
+                    b.Navigation("Profesor");
+                });
+
             modelBuilder.Entity("UPTMDigital.API.Models.Usuario", b =>
                 {
+                    b.HasOne("UPTMDigital.API.Models.RegistroInstitucional", "RegistroInstitucional")
+                        .WithMany()
+                        .HasForeignKey("RegistroInstitucionalId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("UPTMDigital.API.Models.Rol", "Rol")
                         .WithMany()
                         .HasForeignKey("RolId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("RegistroInstitucional");
 
                     b.Navigation("Rol");
                 });

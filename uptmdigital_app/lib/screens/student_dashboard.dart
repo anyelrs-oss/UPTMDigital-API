@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:uptmdigital_app/theme.dart';
 import 'package:uptmdigital_app/services/api_service.dart';
+import 'package:uptmdigital_app/services/supabase_service.dart';
 import 'package:uptmdigital_app/screens/login_screen.dart';
-import 'package:uptmdigital_app/screens/constancias_screen.dart';
+import 'package:uptmdigital_app/screens/inbox_screen.dart';
+import 'package:uptmdigital_app/screens/noticias_list_screen.dart';
 import 'package:uptmdigital_app/widgets/anuncios_carousel.dart';
 import 'package:uptmdigital_app/widgets/student_progress.dart';
-import 'package:uptmdigital_app/screens/carnet_screen.dart';
-import 'package:uptmdigital_app/screens/qr_scan_screen.dart';
-import 'package:uptmdigital_app/screens/horarios_screen.dart';
 import 'package:uptmdigital_app/widgets/institutional_card.dart';
 import 'package:uptmdigital_app/widgets/menu_bottom_sheet.dart';
+import 'package:uptmdigital_app/widgets/upcoming_evaluations.dart';
+import 'package:uptmdigital_app/screens/carnet_screen.dart';
+import 'package:uptmdigital_app/screens/my_grades_screen.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'dart:convert';
 
 
 class StudentDashboard extends StatefulWidget {
@@ -31,12 +36,86 @@ class _StudentDashboardState extends State<StudentDashboard> {
   }
 
   Future<void> _loadStudentData() async {
-    final data = await ApiService().getStudentMe();
-    if (mounted) {
+    final api = ApiService();
+
+    // 1. Intentar cargar de caché primero para rapidez
+    final cached = await api.storage.read(key: 'cached_student_data');
+    if (cached != null && mounted) {
+      setState(() {
+        _studentData = jsonDecode(cached);
+        _isLoading = false;
+      });
+    }
+
+    // 2. Cargar de la red en segundo plano para actualizar
+    final data = await api.getStudentMe();
+    if (mounted && data != null) {
       setState(() {
         _studentData = data;
         _isLoading = false;
       });
+    } else if (mounted && _studentData == null) {
+      // Solo marcamos como no cargando si no había caché y falló la red
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _confirmLogout() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Cerrar Sesión"),
+        content: const Text("¿Estás seguro de que deseas salir de tu cuenta?"),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancelar")),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await ApiService().logout();
+              if (mounted) {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text("Cerrar Sesión"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickProfileImage() async {
+    final picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 50);
+
+    if (image == null) return;
+
+    setState(() => _isLoading = true);
+
+    final file = File(image.path);
+    final fileName = "profile_std_${_studentData!['idEstudiante']}.jpg";
+
+    final url = await SupabaseService().uploadImage(file, fileName);
+
+    if (url != null) {
+      final success = await ApiService().updateStudent(_studentData!['idEstudiante'], {
+        ..._studentData!,
+        'fotoUrl': url
+      });
+
+      if (success) {
+        _loadStudentData();
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Foto de perfil actualizada")));
+      }
+    } else {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Error al subir imagen")));
+      }
     }
   }
 
@@ -83,14 +162,16 @@ class _StudentDashboardState extends State<StudentDashboard> {
         title = "UPTM Digital";
         break;
       case 1:
-        activePage = HorariosScreen(studentId: _studentData!['idEstudiante']);
-        title = "Mi Horario";
+        // Cargar Notas del Estudiante (Me)
+        activePage = const MyGradesScreen();
+        title = "Mis Calificaciones";
         break;
-      case 3: // Index 3 because 2 is the space for FAB
-        activePage = ConstanciasScreen(studentId: _studentData!['idEstudiante']);
-        title = "Mis Constancias";
+      case 2:
+        // Carnet movido fuera del menú
+        activePage = CarnetScreen(studentData: _studentData!);
+        title = "Carnet Digital";
         break;
-      case 4:
+      case 3:
         activePage = _buildProfileTab();
         title = "Mi Perfil";
         break;
@@ -113,14 +194,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
           ),
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await ApiService().logout();
-              if (context.mounted) {
-                 Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                );
-              }
-            },
+            onPressed: _confirmLogout,
             tooltip: "Cerrar Sesión",
           ),
         ],
@@ -146,10 +220,10 @@ class _StudentDashboardState extends State<StudentDashboard> {
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: <Widget>[
             _buildNavItem(0, Icons.home_outlined, "Inicio"),
-            _buildNavItem(1, Icons.calendar_today_outlined, "Horario"),
+            _buildNavItem(1, Icons.grade_outlined, "Notas"),
             const SizedBox(width: 48), // The space for the FAB
-            _buildNavItem(3, Icons.description_outlined, "Constancias"),
-            _buildNavItem(4, Icons.person_outline, "Perfil"),
+            _buildNavItem(2, Icons.badge_outlined, "Carnet"),
+            _buildNavItem(3, Icons.person_outline, "Perfil"),
           ],
         ),
       ),
@@ -176,7 +250,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 10,
                   color: _currentIndex == index ? AppTheme.primary : Colors.grey,
                 ),
               ),
@@ -189,9 +263,24 @@ class _StudentDashboardState extends State<StudentDashboard> {
 
   Widget _buildHomeTab() {
     return ListView(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.only(bottom: 100, top: 16, left: 16, right: 16),
       children: [
 
+
+        // 1. Academic Status Banner (Fase 8)
+        if (!(_studentData!['estadoArancel'] ?? true))
+          Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: Colors.red.shade100, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.red.shade300)),
+            child: const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Colors.red),
+                SizedBox(width: 12),
+                Expanded(child: Text("Periodo Inactivo. Pendiente por pago de aranceles.", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 12))),
+              ],
+            ),
+          ),
 
         // 2. Academic Progress
         InstitutionalCard(
@@ -199,7 +288,13 @@ class _StudentDashboardState extends State<StudentDashboard> {
           child: StudentProgress(studentId: _studentData!['idEstudiante']),
         ),
 
-        // 3. News / Announcements
+        // 3. Upcoming Evaluations
+        InstitutionalCard(
+          title: "Próximas Evaluaciones",
+          child: UpcomingEvaluations(studentId: _studentData!['idEstudiante']),
+        ),
+
+        // 4. News / Announcements
         InstitutionalCard(
           title: "Noticias Institucionales",
           padding: EdgeInsets.zero, // Carousel handles its own padding
@@ -209,7 +304,12 @@ class _StudentDashboardState extends State<StudentDashboard> {
                const AnunciosCarousel(),
                const SizedBox(height: 16),
                TextButton(
-                 onPressed: () {},
+                 onPressed: () {
+                   setState(() {
+                     // El menu FAB tiene noticias, pero si queremos navegar desde aquí:
+                     Navigator.push(context, MaterialPageRoute(builder: (_) => const NoticiasListScreen()));
+                   });
+                 },
                  child: const Text("Ver todas las noticias"),
                ),
             ],
@@ -219,34 +319,6 @@ class _StudentDashboardState extends State<StudentDashboard> {
     );
   }
 
-  Widget _buildQuickAction({required IconData icon, required String label, required VoidCallback onTap}) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: 80,
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppTheme.primary.withOpacity(0.05),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: AppTheme.primary, size: 28),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildProfileTab() {
     return ListView(
@@ -256,10 +328,31 @@ class _StudentDashboardState extends State<StudentDashboard> {
           child: Column(
              children: [
                const SizedBox(height: 16),
-               const CircleAvatar(
-                radius: 50,
-                child: Icon(Icons.person, size: 50),
-              ),
+               Stack(
+                 children: [
+                   CircleAvatar(
+                    radius: 50,
+                    backgroundImage: _studentData!['fotoUrl'] != null
+                        ? NetworkImage(_studentData!['fotoUrl'])
+                        : null,
+                    child: _studentData!['fotoUrl'] == null
+                        ? const Icon(Icons.person, size: 50)
+                        : null,
+                  ),
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: CircleAvatar(
+                      radius: 18,
+                      backgroundColor: AppTheme.primary,
+                      child: IconButton(
+                        icon: const Icon(Icons.camera_alt, size: 18, color: Colors.white),
+                        onPressed: _pickProfileImage,
+                      ),
+                    ),
+                  ),
+                 ],
+               ),
               const SizedBox(height: 16),
               Text(
                 "${_studentData!['nombres']} ${_studentData!['apellidos']}",
@@ -336,9 +429,9 @@ class _StudentDashboardState extends State<StudentDashboard> {
   }
 
   void _showEditProfileDialog() {
-    final _direccionController = TextEditingController(text: _studentData!['direccion']);
-    final _telefonoController = TextEditingController(text: _studentData!['telefono']);
-    final _correoController = TextEditingController(text: _studentData!['correoInstitucional']);
+    final direccionController = TextEditingController(text: _studentData!['direccion']);
+    final telefonoController = TextEditingController(text: _studentData!['telefono']);
+    final correoController = TextEditingController(text: _studentData!['correoInstitucional']);
 
     showDialog(
       context: context,
@@ -348,17 +441,17 @@ class _StudentDashboardState extends State<StudentDashboard> {
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
-              controller: _direccionController,
+              controller: direccionController,
               decoration: const InputDecoration(labelText: "Dirección"),
             ),
             const SizedBox(height: 8),
             TextField(
-              controller: _telefonoController,
+              controller: telefonoController,
               decoration: const InputDecoration(labelText: "Teléfono"),
             ),
             const SizedBox(height: 8),
             TextField(
-              controller: _correoController,
+              controller: correoController,
               decoration: const InputDecoration(labelText: "Correo Institucional"),
             ),
           ],
@@ -372,14 +465,15 @@ class _StudentDashboardState extends State<StudentDashboard> {
             onPressed: () async {
               final updatedData = {
                 ..._studentData!,
-                "direccion": _direccionController.text,
-                "telefono": _telefonoController.text,
-                "correoInstitucional": _correoController.text,
+                "direccion": direccionController.text,
+                "telefono": telefonoController.text,
+                "correoInstitucional": correoController.text,
               };
               
               final success = await ApiService().updateStudent(_studentData!['idEstudiante'], updatedData);
+              if (!mounted) return;
               if (success) {
-                 Navigator.pop(ctx);
+                 if (ctx.mounted) Navigator.pop(ctx);
                  _loadStudentData(); // Refresh data
                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Perfil actualizado")));
               } else {

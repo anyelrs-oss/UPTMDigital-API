@@ -19,12 +19,29 @@ namespace UPTMDigital.API.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Inscripcion>>> GetInscripciones()
+        public async Task<ActionResult<IEnumerable<Inscripcion>>> GetInscripciones(
+            [FromQuery] int page = 1,
+            [FromQuery] int limit = 50)
         {
-            return await _context.Inscripciones
+            // Seguridad: limitar el tamaño máximo de página
+            if (limit > 200) limit = 200;
+            if (page < 1) page = 1;
+
+            var skip = (page - 1) * limit;
+            
+            var total = await _context.Inscripciones.CountAsync();
+            var inscripciones = await _context.Inscripciones
                 .Include(i => i.Estudiante)
                 .Include(i => i.Asignatura)
+                .Skip(skip)
+                .Take(limit)
                 .ToListAsync();
+
+            Response.Headers.Add("X-Total-Count", total.ToString());
+            Response.Headers.Add("X-Page", page.ToString());
+            Response.Headers.Add("X-Limit", limit.ToString());
+
+            return inscripciones;
         }
 
         [HttpGet("asignatura/{asignaturaId}")]

@@ -106,18 +106,21 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
             children: [
               TextFormField(
                 controller: _cedulaController,
+                enabled: !isEditing, // Bloqueado si ya existe
                 decoration: const InputDecoration(labelText: 'Cédula'),
                 validator: (value) => value == null || value.isEmpty ? 'Campo requerido' : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _nombresController,
+                enabled: !isEditing, // Bloqueado si ya existe
                 decoration: const InputDecoration(labelText: 'Nombres'),
                 validator: (value) => value == null || value.isEmpty ? 'Campo requerido' : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _apellidosController,
+                enabled: !isEditing, // Bloqueado si ya existe
                 decoration: const InputDecoration(labelText: 'Apellidos'),
                 validator: (value) => value == null || value.isEmpty ? 'Campo requerido' : null,
               ),
@@ -137,7 +140,7 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
                     child: Text(item['nombre']),
                   );
                 }).toList(),
-                onChanged: (val) {
+                onChanged: isEditing ? null : (val) {
                   setState(() {
                     _carreraController.text = val ?? '';
                   });
