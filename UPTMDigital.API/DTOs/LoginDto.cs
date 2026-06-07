@@ -13,5 +13,6 @@ namespace UPTMDigital.API.DTOs
         public DateTime Expiracion { get; set; }
         public string NombreUsuario { get; set; } = null!;
         public string Rol { get; set; } = null!;
+        public int IdUsuario { get; set; }
     }
 }

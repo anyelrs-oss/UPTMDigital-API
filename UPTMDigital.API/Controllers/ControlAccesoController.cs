@@ -111,7 +111,7 @@ namespace UPTMDigital.API.Controllers
             var profesores = await _context.Profesores.Where(p => cedulas.Contains(p.Cedula)).ToDictionaryAsync(p => p.Cedula, p => $"{p.Nombres} {p.Apellidos}");
 
             var resultado = historial.Select(h => new {
-                h.IdAcceso,
+                h.Id,
                 h.Cedula,
                 h.Tipo,
                 h.Ubicacion,
