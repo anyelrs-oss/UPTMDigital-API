@@ -317,9 +317,9 @@ class _UsuariosScreenState extends State<UsuariosScreen> {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Procesando cambio...")));
         final success = await ApiService().resetPasswordUsuario(id, ctrl.text);
         if (success && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("¡Contraseña actualizada correctamente!", backgroundColor: Colors.green)));
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text("¡Contraseña actualizada correctamente!"), backgroundColor: Colors.green));
         } else if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Error al cambiar contraseña"), backgroundColor: Colors.red));
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: const Text("Error al cambiar contraseña"), backgroundColor: Colors.red));
         }
       }
     }

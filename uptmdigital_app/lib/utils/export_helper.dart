@@ -86,7 +86,7 @@ class ExportHelper {
             alignment: pw.Alignment.centerRight,
             child: pw.Column(
               children: [
-                pw.Container(width: 150, border: const pw.Border(top: pw.BorderSide(width: 1))),
+                pw.Container(width: 150, decoration: const pw.BoxDecoration(border: pw.Border(top: pw.BorderSide(width: 1)))),
                 pw.Text("Sello y Firma Autorizada", style: const pw.TextStyle(fontSize: 10)),
               ],
             ),

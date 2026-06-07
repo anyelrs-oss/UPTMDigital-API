@@ -4,6 +4,7 @@ import 'package:uptmdigital_app/services/api_service.dart';
 import 'package:uptmdigital_app/theme.dart';
 import 'package:uptmdigital_app/screens/student_form_screen.dart';
 import 'package:uptmdigital_app/widgets/search_filter_bar.dart';
+import 'package:uptmdigital_app/services/supabase_service.dart';
 import 'dart:convert';
 
 class EstudiantesScreen extends StatefulWidget {

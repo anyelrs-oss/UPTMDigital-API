@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:uptmdigital_app/theme.dart';
+import 'package:uptmdigital_app/services/api_service.dart';
 import 'package:uptmdigital_app/screens/carnet_screen.dart';
 import 'package:uptmdigital_app/screens/qr_scan_screen.dart';
 import 'package:uptmdigital_app/screens/horarios_screen.dart';
@@ -10,6 +11,11 @@ import 'package:uptmdigital_app/screens/notas_screen.dart';
 import 'package:uptmdigital_app/screens/my_grades_screen.dart';
 import 'package:uptmdigital_app/screens/noticias_list_screen.dart';
 import 'package:uptmdigital_app/screens/inbox_screen.dart';
+import 'package:uptmdigital_app/screens/security_qr_screen.dart';
+import 'package:uptmdigital_app/screens/classroom_opening_screen.dart';
+import 'package:uptmdigital_app/screens/reporte_asistencia_docente_screen.dart';
+import 'package:uptmdigital_app/screens/anuncios_admin_screen.dart';
+import 'package:uptmdigital_app/screens/auditoria_main_screen.dart';
 
 class MenuBottomSheet extends StatelessWidget {
   final String role; // 'admin', 'student', 'professor', 'security'
@@ -301,7 +307,7 @@ class MenuBottomSheet extends StatelessWidget {
              'items': [
                {'icon': Icons.report_problem, 'label': 'Reportes', 'onTap': notImpl},
                {'icon': Icons.info_outline, 'label': 'Estado API', 'onTap': () async {
-                  final ok = await ApiService().getHealth();
+                  final ok = await ApiService.instance.getHealth();
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                       content: Text(ok ? "Servidor Conectado" : "Servidor No Disponible"),

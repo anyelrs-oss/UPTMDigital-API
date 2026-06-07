@@ -6,7 +6,9 @@ import 'package:uptmdigital_app/utils/export_helper.dart';
 
 class AsistenciasScreen extends StatefulWidget {
   final int? professorId;
-  const AsistenciasScreen({super.key, this.professorId});
+  final int? asignaturaId;
+  final String? asignaturaNombre;
+  const AsistenciasScreen({super.key, this.professorId, this.asignaturaId, this.asignaturaNombre});
 
   @override
   State<AsistenciasScreen> createState() => _AsistenciasScreenState();
@@ -51,8 +53,8 @@ class _AsistenciasScreenState extends State<AsistenciasScreen> {
     final headers = ["Estudiante", "Cédula", "Fecha", "Estado"];
     final data = _asistencias.map((a) {
       final student = a['estudiante'] != null ? "${a['estudiante']['nombres']} ${a['estudiante']['apellidos']}" : "N/A";
-      final cedula = a['estudiante'] != null ? a['estudiante']['cedula'] : "N/A";
-      final date = a['fecha'].split('T')[0];
+      final cedula = a['estudiante'] != null ? a['estudiante']['cedula'].toString() : "N/A";
+      final date = a['fecha'].split('T')[0].toString();
       return [student, cedula, date, a['estado'].toString()];
     }).toList();
 

@@ -6,6 +6,8 @@ class Profesor {
   final String correoInstitucional;
   final String departamento;
   final int? usuarioId;
+  final String? profileImageUrl;
+  final String? telefono;
 
   Profesor({
     required this.idProfesor,
@@ -15,6 +17,8 @@ class Profesor {
     required this.correoInstitucional,
     required this.departamento,
     this.usuarioId,
+    this.profileImageUrl,
+    this.telefono,
   });
 
   factory Profesor.fromJson(Map<String, dynamic> json) {
@@ -26,6 +30,22 @@ class Profesor {
       correoInstitucional: json['correoInstitucional'] ?? '',
       departamento: json['departamento'] ?? '',
       usuarioId: json['usuarioId'],
+      profileImageUrl: json['profileImageUrl'],
+      telefono: json['telefono'],
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'idProfesor': idProfesor,
+      'cedula': cedula,
+      'nombres': nombres,
+      'apellidos': apellidos,
+      'correoInstitucional': correoInstitucional,
+      'departamento': departamento,
+      'usuarioId': usuarioId,
+      'profileImageUrl': profileImageUrl,
+      'telefono': telefono,
+    };
   }
 }

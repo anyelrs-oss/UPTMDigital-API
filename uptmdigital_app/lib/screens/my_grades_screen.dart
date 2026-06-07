@@ -121,7 +121,7 @@ class _MyGradesScreenState extends State<MyGradesScreen> {
                   calificacion.toInt().toString(),
                   style: TextStyle(
                     fontSize: 20,
-                    fontWeight: FontWeight.black,
+                    fontWeight: FontWeight.w900,
                     color: colorEstado,
                   ),
                 ),

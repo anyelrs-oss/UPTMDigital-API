@@ -51,7 +51,9 @@ class _HorariosScreenState extends State<HorariosScreen> {
           idAsignatura: widget.asignaturaId!,
           nombre: widget.asignaturaNombre ?? "Materia Seleccionada",
           codigo: "",
-          semestreNombre: ""
+          semestreNombre: "",
+          creditos: 0,
+          departamento: "",
         )];
       } else {
         // Carga completa (antigua, lenta)
@@ -84,9 +86,18 @@ class _HorariosScreenState extends State<HorariosScreen> {
       body: Column(
         children: [
           if (widget.asignaturaId == null) // Solo mostrar búsqueda si no es jerárquico
-            SearchFilterBar(
-              hintText: "Buscar materia...",
-              onSearchChanged: (val) => setState(() => _searchQuery = val.toLowerCase()),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: TextField(
+                decoration: InputDecoration(
+                  hintText: 'Buscar materia...',
+                  prefixIcon: const Icon(Icons.search),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  filled: true,
+                  fillColor: Colors.grey[100],
+                ),
+                onChanged: (val) => setState(() => _searchQuery = val.toLowerCase()),
+              ),
             ),
           Expanded(
             child: _isLoading
@@ -115,7 +126,7 @@ class _HorariosScreenState extends State<HorariosScreen> {
             title: Text(a.nombre, style: const TextStyle(fontWeight: FontWeight.bold)),
             subtitle: Text("${a.codigo} • Semestre ${a.semestreNombre}"),
             children: list.map((h) => ListTile(
-              leading: const Icon(Icons.access_time, size: 20, color: AppTheme.secondary),
+              leading: Icon(Icons.access_time, size: 20, color: const Color(0xFFC9A84C)),
               title: Text("${h['dia']}: ${h['horaInicio']} - ${h['horaFin']}"),
               subtitle: Text("Aula: ${h['aula']}"),
               trailing: widget.isAdmin
@@ -159,9 +170,9 @@ class _HorariosScreenState extends State<HorariosScreen> {
       onTap: onTap,
       child: Column(
         children: [
-          Icon(icon, size: 20, color: AppTheme.primary),
+          Icon(icon, size: 20, color: const Color(0xFF0D1B2A)),
           const SizedBox(height: 4),
-          Text(label, style: const TextStyle(fontSize: 10, color: AppTheme.primary, fontWeight: FontWeight.bold)),
+          Text(label, style: TextStyle(fontSize: 10, color: const Color(0xFF0D1B2A), fontWeight: FontWeight.bold)),
         ],
       ),
     );

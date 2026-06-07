@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:uptmdigital_app/screens/subject_selection_screen.dart';
+import 'package:uptmdigital_app/services/api_service.dart';
 import 'package:uptmdigital_app/theme.dart';
 import 'package:uptmdigital_app/widgets/institutional_card.dart';
 
@@ -25,8 +26,8 @@ class _AcademicHierarchyScreenState extends State<AcademicHierarchyScreen> {
   }
 
   Future<void> _loadInitialData() async {
-    final carreras = await ApiService().getCarreras();
-    final semestres = await ApiService().getSemestres();
+    final carreras = await ApiService.instance.getCarreras();
+    final semestres = await ApiService.instance.getSemestres();
     if (mounted) {
       setState(() {
         _carreras = carreras;

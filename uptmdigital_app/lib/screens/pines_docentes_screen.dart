@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:uptmdigital_app/services/api_service.dart';
 import 'package:uptmdigital_app/widgets/institutional_card.dart';
 import 'package:intl/intl.dart';
@@ -9,8 +10,6 @@ class PinesDocentesScreen extends StatefulWidget {
   @override
   State<PinesDocentesScreen> createState() => _PinesDocentesScreenState();
 }
-
-import 'package:flutter/services.dart';
 
 class _PinesDocentesScreenState extends State<PinesDocentesScreen> {
   List<dynamic> _pines = [];

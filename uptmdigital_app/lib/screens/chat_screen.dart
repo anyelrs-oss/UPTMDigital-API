@@ -212,8 +212,11 @@ class _ChatScreenState extends State<ChatScreen> {
                 borderRadius: BorderRadius.circular(8),
                 child: Image.network(
                   msg.imageUrl!,
-                  placeholder: (context, url) => const SizedBox(height: 100, child: Center(child: CircularProgressIndicator())),
-                  errorWidget: (context, url, error) => const Icon(Icons.error),
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return const SizedBox(height: 100, child: Center(child: CircularProgressIndicator()));
+                  },
+                  errorBuilder: (context, error, stackTrace) => const Icon(Icons.error),
                 ),
               ),
             if (msg.imageUrl != null) const SizedBox(height: 4),
