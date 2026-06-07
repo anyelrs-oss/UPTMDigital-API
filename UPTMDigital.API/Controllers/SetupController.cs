@@ -40,14 +40,19 @@ namespace UPTMDigital.API.Controllers
                     await EnsureRoleAsync("Profesor");
                     await EnsureRoleAsync("Estudiante");
                     await EnsureRoleAsync("Seguridad");
+                    await EnsureRoleAsync("Coordinador");
+                    await EnsureRoleAsync("Secretaria");
 
                     await EnsureUserWithRoleAsync("tester_admin", "123456", "Administrador", log);
-                    await EnsureUserWithRoleAsync("tester_seg", "123456", "Seguridad", log);
-                    await EnsureUserWithRoleAsync("tester_prof", "123456", "Profesor", log);
-                    await EnsureUserWithRoleAsync("tester_est", "123456", "Estudiante", log);
+                    await EnsureUserWithRoleAsync("tester_seg",   "123456", "Seguridad",     log);
+                    await EnsureUserWithRoleAsync("tester_prof",  "123456", "Profesor",      log);
+                    await EnsureUserWithRoleAsync("tester_est",   "123456", "Estudiante",    log);
+                    await EnsureUserWithRoleAsync("tester_coord", "123456", "Coordinador",   log);
+                    await EnsureUserWithRoleAsync("tester_sec",   "123456", "Secretaria",    log);
 
                     await EnsureProfesorProfileAsync("tester_prof", log);
                     await EnsureEstudianteProfileAsync("tester_est", log);
+                    await EnsureCoordinadorProfileAsync("tester_coord", log);
 
                     await _context.SaveChangesAsync();
                     await tx.CommitAsync();
@@ -68,9 +73,11 @@ namespace UPTMDigital.API.Controllers
                 credentials = new[]
                 {
                     new { username = "tester_admin", password = "123456", role = "Administrador" },
-                    new { username = "tester_seg", password = "123456", role = "Seguridad" },
-                    new { username = "tester_prof", password = "123456", role = "Profesor" },
-                    new { username = "tester_est", password = "123456", role = "Estudiante" }
+                    new { username = "tester_seg",   password = "123456", role = "Seguridad" },
+                    new { username = "tester_prof",  password = "123456", role = "Profesor" },
+                    new { username = "tester_est",   password = "123456", role = "Estudiante" },
+                    new { username = "tester_coord", password = "123456", role = "Coordinador" },
+                    new { username = "tester_sec",   password = "123456", role = "Secretaria" }
                 },
                 log
             });
@@ -221,6 +228,23 @@ namespace UPTMDigital.API.Controllers
                 UsuarioId = usr.IdUsuario
             });
             log.Add($"Created student profile linked to '{username}'.");
+        }
+
+        private async Task EnsureCoordinadorProfileAsync(string username, List<string> log)
+        {
+            var usr = await _context.Usuarios.FirstOrDefaultAsync(u => u.NombreUsuario == username);
+            if (usr == null) return;
+            var profile = await _context.Coordinadores.FirstOrDefaultAsync(c => c.UsuarioId == usr.IdUsuario);
+            if (profile != null) return;
+
+            _context.Coordinadores.Add(new Coordinador
+            {
+                Nombres = "Test",
+                Apellidos = "Coordinador",
+                UsuarioId = usr.IdUsuario,
+                Activo = true
+            });
+            log.Add($"Created coordinator profile linked to '{username}'.");
         }
 
         // ── SEED PASO 1: Roles + Profesores + Estudiantes ────────────────────────
@@ -533,7 +557,7 @@ namespace UPTMDigital.API.Controllers
             try
             {
                 // 1.1 Seed Roles (Critical for User Creation)
-                var rolesNames = new[] { "Administrador", "Profesor", "Estudiante", "Seguridad", "Secretaria", "SuperAdmin", "Auditor" };
+                var rolesNames = new[] { "Administrador", "Profesor", "Estudiante", "Seguridad", "Secretaria", "SuperAdmin", "Auditor", "Coordinador" };
                 foreach (var rName in rolesNames)
                 {
                     if (!await _context.Roles.AnyAsync(r => r.NombreRol == rName))
@@ -650,10 +674,10 @@ namespace UPTMDigital.API.Controllers
 
                 // 3. Seed New Roles for Test (Secretaria, Auditor, Seguridad, Coordinador)
                 var demoUsers = new[] {
-                    new { Role = "Secretaria", User = "secretaria1", Pass = "123456", CI = "V-11111111" },
-                    new { Role = "Auditor", User = "auditor1", Pass = "123456", CI = "V-22222222" },
-                    new { Role = "Seguridad", User = "seguridad1", Pass = "123456", CI = "V-33333333" },
-                    new { Role = "Coordinador", User = "coordinador1", Pass = "123456", CI = "V-44444444" }
+                    new { Role = "Secretaria",  User = "tester_sec",   Pass = "123456", CI = "V-11111111" },
+                    new { Role = "Auditor",     User = "tester_aud",   Pass = "123456", CI = "V-22222222" },
+                    new { Role = "Seguridad",   User = "tester_seg",   Pass = "123456", CI = "V-33333333" },
+                    new { Role = "Coordinador", User = "tester_coord", Pass = "123456", CI = "V-44444444" }
                 };
 
                 foreach (var demo in demoUsers)
@@ -1060,7 +1084,16 @@ namespace UPTMDigital.API.Controllers
             return Ok(new
             {
                 message = "🎓 ¡Base de datos completamente poblada para la mesa técnica!",
-                credenciales = new[]
+                credenciales_principales = new[]
+                {
+                    new { usuario = "tester_admin", pass = "123456", rol = "Administrador" },
+                    new { usuario = "tester_prof",  pass = "123456", rol = "Profesor" },
+                    new { usuario = "tester_est",   pass = "123456", rol = "Estudiante" },
+                    new { usuario = "tester_seg",   pass = "123456", rol = "Seguridad" },
+                    new { usuario = "tester_coord", pass = "123456", rol = "Coordinador" },
+                    new { usuario = "tester_sec",   pass = "123456", rol = "Secretaria" },
+                },
+                credenciales_demo = new[]
                 {
                     new { usuario = "prof_garcia",    pass = "123456", rol = "Profesor",    nombre = "Carlos García" },
                     new { usuario = "prof_mendoza",   pass = "123456", rol = "Profesor",    nombre = "María Mendoza" },
