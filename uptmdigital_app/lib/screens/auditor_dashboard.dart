@@ -4,8 +4,32 @@ import 'package:uptmdigital_app/services/api_service.dart';
 import 'package:uptmdigital_app/screens/login_screen.dart';
 import 'package:uptmdigital_app/theme.dart';
 
-class AuditorDashboard extends StatelessWidget {
+import 'package:uptmdigital_app/widgets/menu_bottom_sheet.dart';
+
+class AuditorDashboard extends StatefulWidget {
   const AuditorDashboard({super.key});
+
+  @override
+  State<AuditorDashboard> createState() => _AuditorDashboardState();
+}
+
+class _AuditorDashboardState extends State<AuditorDashboard> {
+  Map<String, dynamic>? _userData;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    final data = await ApiService().getUserMe();
+    if (mounted) {
+      setState(() {
+        _userData = data;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,6 +50,17 @@ class AuditorDashboard extends StatelessWidget {
           ],
         ),
         body: const AuditoriaMainScreen(),
+        floatingActionButton: FloatingActionButton(
+          onPressed: () {
+            showModalBottomSheet(
+              context: context,
+              backgroundColor: Colors.transparent,
+              builder: (context) => MenuBottomSheet(role: 'auditor', userData: _userData),
+            );
+          },
+          backgroundColor: AppTheme.secondary,
+          child: const Icon(Icons.apps, color: Colors.white),
+        ),
       ),
     );
   }

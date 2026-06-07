@@ -49,19 +49,39 @@ class _EvaluarScreenState extends State<EvaluarScreen> {
 
   Future<void> _publicarNotas() async {
     if (_selectedEval == null) return;
-    setState(() => _isLoading = true);
 
-    // Simulación de envío masivo
+    // Validar que al menos haya una nota ingresada
+    final Map<int, double> notasParaSubir = {};
     for (var entry in _notasControllers.entries) {
       if (entry.value.text.isNotEmpty) {
-        // En una v3 esto enviaría al endpoint de notas vinculando con el PlanId
+        final val = double.tryParse(entry.value.text);
+        if (val != null) {
+          notasParaSubir[entry.key] = val;
+        }
       }
     }
 
-    await Future.delayed(const Duration(seconds: 1));
+    if (notasParaSubir.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("No se ingresaron notas válidas.")));
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    final success = await ApiService().createNotasMasivo(
+      widget.asignaturaId,
+      _selectedEval['idEvaluacion'],
+      notasParaSubir
+    );
+
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Notas subidas exitosamente.")));
-      Navigator.pop(context);
+      setState(() => _isLoading = false);
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Notas subidas exitosamente.")));
+        Navigator.pop(context);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Error al subir notas al servidor."), backgroundColor: Colors.red));
+      }
     }
   }
 

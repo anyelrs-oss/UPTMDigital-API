@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Text.RegularExpressions;
 using UPTMDigital.API.Data;
 using UPTMDigital.API.Models;
+using UglyToad.PdfPig;
 
 namespace UPTMDigital.API.Controllers
 {
@@ -20,8 +21,7 @@ namespace UPTMDigital.API.Controllers
         }
 
         /// <summary>
-        /// Recibe un archivo PDF como texto plano pre-extraído e intenta identificar evaluaciones.
-        /// Formato esperado: "Nombre de actividad ... 20% ... dd/mm/yyyy"
+        /// Recibe un archivo PDF e intenta extraer texto usando PdfPig e identificar evaluaciones.
         /// </summary>
         [HttpPost("extract-pdf")]
         public async Task<IActionResult> ExtractFromPdf(IFormFile file)
@@ -32,21 +32,30 @@ namespace UPTMDigital.API.Controllers
 
             try
             {
-                using var reader = new StreamReader(file.OpenReadStream());
-                var text = await reader.ReadToEndAsync();
+                using var stream = file.OpenReadStream();
+                using var document = PdfDocument.Open(stream);
 
-                // Regex para buscar patrones comunes: Nombre (Texto) + Porcentaje (Número%) + Fecha (dd/mm/aaaa)
-                // Ej: "Examen Parcial 25% 15/06/2024"
-                var matches = Regex.Matches(text, @"([a-zA-ZñÑáéíóúÁÉÍÓÚ\s]+)\s+(\d{1,2})%\s+(\d{1,2}/\d{1,2}/\d{4})");
+                var fullText = "";
+                foreach (var page in document.GetPages())
+                {
+                    fullText += page.Text;
+                }
+
+                // Regex para buscar patrones comunes: Nombre + Porcentaje% + Fecha (dd/mm/aaaa o dd/mm)
+                var matches = Regex.Matches(fullText, @"([a-zA-ZñÑáéíóúÁÉÍÓÚ\s]{5,30})\s+(\d{1,2})%\s+(\d{1,2}/\d{1,2}(?:/\d{4})?)");
 
                 foreach (Match match in matches)
                 {
-                    extractedEvaluations.Add(new EvaluacionDto
+                    var pond = decimal.Parse(match.Groups[2].Value);
+                    if (pond > 0 && pond <= 100)
                     {
-                        Nombre = match.Groups[1].Value.Trim(),
-                        Ponderacion = decimal.Parse(match.Groups[2].Value),
-                        FechaStr = match.Groups[3].Value
-                    });
+                        extractedEvaluations.Add(new EvaluacionDto
+                        {
+                            Nombre = match.Groups[1].Value.Trim(),
+                            Ponderacion = pond,
+                            FechaStr = match.Groups[3].Value
+                        });
+                    }
                 }
 
                 if (extractedEvaluations.Count == 0)
@@ -61,7 +70,7 @@ namespace UPTMDigital.API.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"Error procesando archivo: {ex.Message}");
+                return StatusCode(500, $"Error procesando archivo PDF: {ex.Message}");
             }
         }
 

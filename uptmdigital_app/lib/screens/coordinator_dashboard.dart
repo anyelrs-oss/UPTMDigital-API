@@ -6,6 +6,8 @@ import 'package:uptmdigital_app/screens/login_screen.dart';
 import 'package:uptmdigital_app/screens/inbox_screen.dart';
 import 'package:uptmdigital_app/screens/anuncios_admin_screen.dart';
 
+import 'package:uptmdigital_app/widgets/menu_bottom_sheet.dart';
+
 class CoordinatorDashboard extends StatefulWidget {
   const CoordinatorDashboard({super.key});
 
@@ -25,7 +27,7 @@ class _CoordinatorDashboardState extends State<CoordinatorDashboard> {
   }
 
   Future<void> _loadData() async {
-    final data = await ApiService().getCoordinadorMe();
+    final data = await ApiService().getUserMe();
     if (mounted) {
       setState(() {
         _coordData = data;
@@ -56,15 +58,47 @@ class _CoordinatorDashboardState extends State<CoordinatorDashboard> {
         ],
       ),
       body: activePage,
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (i) => setState(() => _currentIndex = i),
-        selectedItemColor: AppTheme.primary,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Inicio"),
-          BottomNavigationBarItem(icon: Icon(Icons.chat), label: "Chats"),
-          BottomNavigationBarItem(icon: Icon(Icons.calendar_month), label: "Horarios"),
-        ],
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          showModalBottomSheet(
+            context: context,
+            backgroundColor: Colors.transparent,
+            builder: (context) => MenuBottomSheet(role: 'coordinator', userData: _coordData),
+          );
+        },
+        backgroundColor: AppTheme.secondary,
+        child: const Icon(Icons.apps, color: Colors.white),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      bottomNavigationBar: BottomAppBar(
+        shape: const CircularNotchedRectangle(),
+        notchMargin: 8.0,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _buildNavItemSimple(Icons.home, "Inicio", 0),
+            const SizedBox(width: 48), // FAB
+            _buildNavItemSimple(Icons.chat, "Chats", 1),
+            _buildNavItemSimple(Icons.calendar_month, "Horarios", 2),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItemSimple(IconData icon, String label, int index) {
+    final isSelected = _currentIndex == index;
+    return InkWell(
+      onTap: () => setState(() => _currentIndex = index),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: isSelected ? AppTheme.primary : Colors.grey),
+            Text(label, style: TextStyle(fontSize: 10, color: isSelected ? AppTheme.primary : Colors.grey)),
+          ],
+        ),
       ),
     );
   }

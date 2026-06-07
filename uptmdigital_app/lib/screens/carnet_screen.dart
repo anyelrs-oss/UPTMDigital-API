@@ -4,9 +4,9 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'dart:convert';
 
 class CarnetScreen extends StatefulWidget {
-  final Map<String, dynamic> studentData;
+  final Map<String, dynamic> userData;
 
-  const CarnetScreen({super.key, required this.studentData});
+  const CarnetScreen({super.key, required this.userData});
 
   @override
   State<CarnetScreen> createState() => _CarnetScreenState();
@@ -37,15 +37,27 @@ class _CarnetScreenState extends State<CarnetScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final bool esSolvente = widget.studentData['estadoArancel'] ?? true;
+    final bool esSolvente = widget.userData['estadoArancel'] ?? true;
+    final String role = widget.userData['rol'] ?? 'Estudiante';
 
     final qrData = jsonEncode({
-      "id": widget.studentData['idEstudiante'],
-      "cedula": widget.studentData['cedula'],
-      "role": "Estudiante",
+      "id": widget.userData['idEstudiante'] ?? widget.userData['idProfesor'] ?? widget.userData['idCoordinador'] ?? widget.userData['idUsuario'],
+      "cedula": widget.userData['cedula'],
+      "role": role,
       "solvente": esSolvente,
       "generated_at": DateTime.now().toIso8601String(),
     });
+
+    String infoAcademica = "UPTM DIGITAL";
+    if (role == 'Estudiante') {
+      infoAcademica = widget.userData['carrera'] ?? 'ESTUDIANTE';
+    } else if (role == 'Profesor') {
+      infoAcademica = widget.userData['departamento'] ?? 'PROFESOR';
+    } else if (role == 'Coordinador') {
+      infoAcademica = widget.userData['carrera']?['nombre'] ?? 'COORDINADOR';
+    } else {
+      infoAcademica = role.toUpperCase();
+    }
 
     return Scaffold(
       appBar: AppBar(title: const Text("Carnet Digital")),
@@ -70,8 +82,8 @@ class _CarnetScreenState extends State<CarnetScreen> {
                 ),
                 child: Stack(
                   children: [
-                    // Fase 8: Marca de agua de solvencia
-                    if (!esSolvente)
+                    // Fase 8: Marca de agua de solvencia (Solo para estudiantes)
+                    if (role == 'Estudiante' && !esSolvente)
                       Positioned.fill(
                         child: Container(
                           decoration: BoxDecoration(borderRadius: BorderRadius.circular(20)),
@@ -112,32 +124,32 @@ class _CarnetScreenState extends State<CarnetScreen> {
                           decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
                           child: CircleAvatar(
                             radius: 60,
-                            backgroundImage: widget.studentData['fotoUrl'] != null
-                                ? NetworkImage(widget.studentData['fotoUrl'])
+                            backgroundImage: widget.userData['fotoUrl'] != null
+                                ? NetworkImage(widget.userData['fotoUrl'])
                                 : const NetworkImage('https://i.pravatar.cc/300'),
                           ),
                         ),
                         
                         const SizedBox(height: 20),
                         Text(
-                          "${widget.studentData['nombres']} ${widget.studentData['apellidos']}",
+                          "${widget.userData['nombres']} ${widget.userData['apellidos']}",
                           style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 5),
                         Text(
-                          "C.I: ${widget.studentData['cedula']}",
+                          "C.I: ${widget.userData['cedula']}",
                           style: const TextStyle(color: Colors.white70, fontSize: 16),
                         ),
                         const SizedBox(height: 15),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
-                            color: esSolvente ? Colors.white24 : Colors.red.withValues(alpha: 0.4),
+                            color: (role == 'Estudiante' && !esSolvente) ? Colors.red.withValues(alpha: 0.4) : Colors.white24,
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            esSolvente ? (widget.studentData['carrera'] ?? 'ESTUDIANTE') : "SOLVENCIA PENDIENTE",
+                            (role == 'Estudiante' && !esSolvente) ? "SOLVENCIA PENDIENTE" : infoAcademica,
                             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
                           ),
                         ),
@@ -154,8 +166,8 @@ class _CarnetScreenState extends State<CarnetScreen> {
                               data: qrData,
                               version: QrVersions.auto,
                               size: 120.0,
-                              eyeStyle: QrEyeStyle(eyeShape: QrEyeShape.square, color: esSolvente ? Colors.black : Colors.grey),
-                              dataModuleStyle: QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: esSolvente ? Colors.black : Colors.grey),
+                              eyeStyle: QrEyeStyle(eyeShape: QrEyeShape.square, color: (role == 'Estudiante' && !esSolvente) ? Colors.grey : Colors.black),
+                              dataModuleStyle: QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: (role == 'Estudiante' && !esSolvente) ? Colors.grey : Colors.black),
                             ),
                           ),
                         ),
@@ -172,8 +184,8 @@ class _CarnetScreenState extends State<CarnetScreen> {
               ),
               const SizedBox(height: 20),
               Text(
-                esSolvente ? "Presente este código para ingresar" : "Acuda a Secretaría para solventar arancel",
-                style: TextStyle(color: esSolvente ? Colors.grey : Colors.red),
+                (role == 'Estudiante' && !esSolvente) ? "Acuda a Secretaría para solventar arancel" : "Presente este código para ingresar",
+                style: TextStyle(color: (role == 'Estudiante' && !esSolvente) ? Colors.red : Colors.grey),
               )
             ],
           ),

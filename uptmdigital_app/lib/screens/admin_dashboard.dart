@@ -17,8 +17,32 @@ import 'package:uptmdigital_app/screens/auditoria_main_screen.dart';
 import 'package:uptmdigital_app/screens/pines_docentes_screen.dart';
 import 'package:uptmdigital_app/widgets/institutional_card.dart';
 
-class AdminDashboard extends StatelessWidget {
+import 'package:uptmdigital_app/screens/carnet_screen.dart';
+
+class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
+
+  @override
+  State<AdminDashboard> createState() => _AdminDashboardState();
+}
+
+class _AdminDashboardState extends State<AdminDashboard> {
+  Map<String, dynamic>? _adminData;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAdminData();
+  }
+
+  Future<void> _loadAdminData() async {
+    final data = await ApiService().getUserMe();
+    if (mounted) {
+      setState(() {
+        _adminData = data;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,6 +57,12 @@ class AdminDashboard extends StatelessWidget {
         ),
         automaticallyImplyLeading: false,
         actions: [
+          if (_adminData != null)
+            IconButton(
+              icon: const Icon(Icons.badge_outlined),
+              tooltip: "Mi Carnet",
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CarnetScreen(userData: {..._adminData!, 'rol': 'Admin'}))),
+            ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () => _confirmLogout(context),
@@ -42,6 +72,27 @@ class AdminDashboard extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          // --- MI PERFIL (Nuevo) ---
+          _SectionHeader(icon: Icons.person, title: "Mi Perfil"),
+          const SizedBox(height: 8),
+          if (_adminData != null)
+            InstitutionalCard(
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundImage: _adminData!['fotoUrl'] != null ? NetworkImage(_adminData!['fotoUrl']) : null,
+                  child: _adminData!['fotoUrl'] == null ? const Icon(Icons.person) : null,
+                ),
+                title: Text(_adminData!['nombreUsuario'] ?? "Administrador"),
+                subtitle: const Text("Administrador del Sistema"),
+                trailing: ElevatedButton.icon(
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => CarnetScreen(userData: {..._adminData!, 'rol': 'Admin'}))),
+                  icon: const Icon(Icons.badge),
+                  label: const Text("VER CARNET"),
+                ),
+              ),
+            ),
+          const SizedBox(height: 12),
+
           // --- PERSONAS ---
           _SectionHeader(icon: Icons.people, title: "Personas"),
           const SizedBox(height: 8),

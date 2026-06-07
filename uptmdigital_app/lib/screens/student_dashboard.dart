@@ -39,7 +39,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
     final api = ApiService();
 
     // 1. Intentar cargar de caché primero para rapidez
-    final cached = await api.storage.read(key: 'cached_student_data');
+    final cached = await api.storage.read(key: 'cached_user_me');
     if (cached != null && mounted) {
       setState(() {
         _studentData = jsonDecode(cached);
@@ -48,7 +48,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
     }
 
     // 2. Cargar de la red en segundo plano para actualizar
-    final data = await api.getStudentMe();
+    final data = await api.getUserMe();
     if (mounted && data != null) {
       setState(() {
         _studentData = data;
@@ -168,7 +168,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
         break;
       case 2:
         // Carnet movido fuera del menú
-        activePage = CarnetScreen(studentData: _studentData!);
+        activePage = CarnetScreen(userData: {..._studentData!, 'rol': 'Estudiante'});
         title = "Carnet Digital";
         break;
       case 3:

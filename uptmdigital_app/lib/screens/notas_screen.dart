@@ -4,6 +4,8 @@ import 'package:uptmdigital_app/theme.dart';
 import 'package:uptmdigital_app/widgets/search_filter_bar.dart';
 import 'package:intl/intl.dart';
 
+import 'package:uptmdigital_app/utils/export_helper.dart';
+
 class NotasScreen extends StatefulWidget {
   final int? professorId;
   final int? asignaturaId;
@@ -40,12 +42,40 @@ class _NotasScreenState extends State<NotasScreen> {
     }
   }
 
+  void _exportarActaPDF() async {
+    final headers = ["Estudiante", "Cédula", "Calificación"];
+    final data = _notas.map((n) {
+      return [
+        n['estudianteNombre']?.toString() ?? "N/A",
+        n['estudianteCedula']?.toString() ?? "N/A",
+        "${n['calificacion']} pts",
+      ];
+    }).toList();
+
+    await ExportHelper.exportToPDF(
+      title: "ACTA DE CALIFICACIONES",
+      subtitle: widget.asignaturaNombre ?? "Materia General",
+      headers: headers,
+      data: data,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final String title = widget.asignaturaNombre ?? "Control de Calificaciones";
 
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
+      appBar: AppBar(
+        title: Text(title),
+        actions: [
+          if (_notas.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.picture_as_pdf),
+              onPressed: _exportarActaPDF,
+              tooltip: "Generar Acta PDF",
+            )
+        ],
+      ),
       body: Column(
         children: [
           if (widget.asignaturaId == null) // Solo mostrar búsqueda si no es jerárquico

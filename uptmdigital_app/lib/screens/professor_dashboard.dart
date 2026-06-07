@@ -44,7 +44,7 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
     final api = ApiService();
 
     // 1. Cargar de caché primero
-    final cached = await api.storage.read(key: 'cached_professor_data');
+    final cached = await api.storage.read(key: 'cached_user_me');
     if (cached != null && mounted) {
       setState(() {
         _professorData = jsonDecode(cached);
@@ -53,7 +53,7 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
     }
 
     // 2. Cargar de red para actualizar
-    final data = await api.getProfessorMe();
+    final data = await api.getUserMe();
     if (mounted && data != null) {
       setState(() {
         _professorData = data;

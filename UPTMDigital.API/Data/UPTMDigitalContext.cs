@@ -84,6 +84,9 @@ namespace UPTMDigital.API.Data
                 .OnDelete(DeleteBehavior.Restrict);
 
             // Índices para optimización de búsquedas y relaciones frecuentes
+            modelBuilder.Entity<Usuario>()
+                .HasIndex(u => u.Cedula).IsUnique();
+
             modelBuilder.Entity<Estudiante>()
                 .HasIndex(e => e.Cedula).IsUnique();
             modelBuilder.Entity<Estudiante>()

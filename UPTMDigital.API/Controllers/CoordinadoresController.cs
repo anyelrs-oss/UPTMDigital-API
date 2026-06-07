@@ -64,6 +64,27 @@ namespace UPTMDigital.API.Controllers
             return Ok(nuevo);
         }
 
+        [Authorize(Roles = "Administrador")]
+        [HttpGet("pines-activos")]
+        public async Task<IActionResult> GetPinesActivos()
+        {
+            var pines = await _context.PinesAsistencia
+                .Include(p => p.Carrera)
+                .Include(p => p.Coordinador)
+                .Where(p => p.Activo && p.FechaExpiracion > DateTime.UtcNow)
+                .Select(p => new
+                {
+                    p.IdPin,
+                    p.Pin,
+                    p.FechaExpiracion,
+                    Carrera = p.Carrera != null ? p.Carrera.Nombre : "General",
+                    Coordinador = p.Coordinador != null ? p.Coordinador.NombreUsuario : "Sistema"
+                })
+                .ToListAsync();
+
+            return Ok(pines);
+        }
+
         public class PinRequest { public int CarreraId { get; set; } }
     }
 }

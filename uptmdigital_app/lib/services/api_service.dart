@@ -408,6 +408,25 @@ class ApiService {
     }
   }
 
+  Future<bool> createNotasMasivo(int asignaturaId, int evaluacionId, Map<int, double> notas) async {
+    try {
+      final notasList = notas.entries.map((e) => {
+        "estudianteId": e.key,
+        "calificacion": e.value
+      }).toList();
+
+      await _dio.post('/api/notas/masivo', data: {
+        "asignaturaId": asignaturaId,
+        "evaluacionId": evaluacionId,
+        "notas": notasList
+      });
+      return true;
+    } catch (e) {
+      debugPrint("Error al subir notas masivas: $e");
+      return false;
+    }
+  }
+
   Future<bool> updateNota(int id, Map<String, dynamic> data) async {
     try {
       await _dio.put('/api/notas/$id', data: data);
@@ -531,15 +550,28 @@ class ApiService {
 
   // --- DASHBOARD HELPERS ---
 
-  Future<Map<String, dynamic>?> getProfessorMe() async {
+  Future<Map<String, dynamic>?> getUserMe() async {
     try {
-      final response = await _dio.get('/api/profesores/me');
+      final response = await _dio.get('/api/auth/me');
       if (response.statusCode == 200) {
-        await storage.write(key: 'cached_professor_data', value: jsonEncode(response.data));
-        return response.data;
+        final data = response.data;
+        // Normalizar los datos para el CarnetScreen
+        Map<String, dynamic> userData = {
+          'idUsuario': data['idUsuario'],
+          'nombreUsuario': data['nombreUsuario'],
+          'cedula': data['cedula'],
+          'rol': data['rol'],
+        };
+
+        if (data['perfil'] != null) {
+          userData.addAll(Map<String, dynamic>.from(data['perfil']));
+        }
+
+        await storage.write(key: 'cached_user_me', value: jsonEncode(userData));
+        return userData;
       }
     } catch (e) {
-      final cached = await storage.read(key: 'cached_professor_data');
+      final cached = await storage.read(key: 'cached_user_me');
       if (cached != null) return jsonDecode(cached);
     }
     return null;
@@ -689,6 +721,16 @@ class ApiService {
       return response.statusCode == 200 ? response.data : {'pin': null};
     } catch (e) {
       return {'pin': null};
+    }
+  }
+
+  Future<List<dynamic>> getPinesActivos() async {
+    try {
+      final response = await _dio.get('/api/coordinadores/pines-activos');
+      return response.statusCode == 200 ? response.data as List : [];
+    } catch (e) {
+      debugPrint("Error fetching active pins: $e");
+      return [];
     }
   }
 

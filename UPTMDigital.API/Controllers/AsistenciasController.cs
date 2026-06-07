@@ -123,31 +123,6 @@ namespace UPTMDigital.API.Controllers
             return Ok(new { success = true, message = "PIN validado correctamente." });
         }
 
-        // POST: api/asistencias/generar-pin (Solo Coordinadores/Admin)
-        [HttpPost("generar-pin")]
-        public async Task<IActionResult> GenerarPin()
-        {
-            // Generar un PIN aleatorio de 6 dígitos
-            var rnd = new Random();
-            var pin = rnd.Next(100000, 999999).ToString();
-
-            // Desactivar pines anteriores
-            var pinesAnteriores = await _context.PinesAsistencia.Where(p => p.Activo).ToListAsync();
-            foreach (var p in pinesAnteriores) p.Activo = false;
-
-            var nuevoPin = new PinAsistencia
-            {
-                Pin = pin,
-                FechaExpiracion = DateTime.UtcNow.AddHours(12), // Validez por el día
-                Activo = true
-            };
-
-            _context.PinesAsistencia.Add(nuevoPin);
-            await _context.SaveChangesAsync();
-
-            return Ok(new { pin = pin, expiracion = nuevoPin.FechaExpiracion });
-        }
-
         public class PinRequest
         {
             public string Pin { get; set; } = null!;

@@ -25,18 +25,36 @@ namespace UPTMDigital.API.Controllers
                 return BadRequest("La Cédula es obligatoria.");
             }
 
-            // 1. Verify if Cedula belongs to a Student or Professor
+            // 1. Verify if Cedula belongs to a Student, Professor or Coordinator
             var estudiante = await _context.Estudiantes.FirstOrDefaultAsync(e => e.Cedula == dto.Cedula);
             var profesor = await _context.Profesores.FirstOrDefaultAsync(p => p.Cedula == dto.Cedula);
+            var coordinador = await _context.Coordinadores.FirstOrDefaultAsync(c => c.Usuario != null && c.Usuario.Cedula == dto.Cedula);
 
-            if (estudiante == null && profesor == null)
+            // If not found in specific profiles, check directly in Usuarios (for Security, Secretariat, etc.)
+            var usuario = await _context.Usuarios.Include(u => u.Rol).FirstOrDefaultAsync(u => u.Cedula == dto.Cedula);
+
+            if (usuario == null && estudiante == null && profesor == null)
             {
                 return NotFound("Cédula no encontrada en el sistema.");
             }
 
             // 2. Identify the person
-            string nombre = estudiante != null ? $"{estudiante.Nombres} {estudiante.Apellidos}" : $"{profesor!.Nombres} {profesor.Apellidos}";
-            string rol = estudiante != null ? "Estudiante" : "Profesor";
+            string nombre = "Usuario";
+            string rol = "N/A";
+
+            if (estudiante != null) {
+                nombre = $"{estudiante.Nombres} {estudiante.Apellidos}";
+                rol = "Estudiante";
+            } else if (profesor != null) {
+                nombre = $"{profesor.Nombres} {profesor.Apellidos}";
+                rol = "Profesor";
+            } else if (coordinador != null) {
+                nombre = $"{coordinador.Nombres} {coordinador.Apellidos}";
+                rol = "Coordinador";
+            } else if (usuario != null) {
+                nombre = usuario.NombreUsuario;
+                rol = usuario.Rol?.NombreRol ?? "Personal";
+            }
 
             // 3. Create Access Record
             var registro = new ControlAcceso
@@ -45,7 +63,6 @@ namespace UPTMDigital.API.Controllers
                 Tipo = dto.Tipo,
                 Ubicacion = dto.Ubicacion,
                 FechaHora = DateTime.Now,
-                // PersonalSeguridadId could be taken from User.Claims if Auth is implemented
             };
 
             _context.ControlAccesos.Add(registro);

@@ -13,6 +13,9 @@ namespace UPTMDigital.API.Models
         public decimal? Calificacion { get; set; }
         public DateTime? Fecha { get; set; }
         public int? ProfesorId { get; set; }
+        public int? EvaluacionId { get; set; }
+        [ForeignKey("EvaluacionId")]
+        public EvaluacionConfig? Evaluacion { get; set; }
         public string? CodigoQR { get; set; }
 
         public Asignatura Asignatura { get; set; } = null!;

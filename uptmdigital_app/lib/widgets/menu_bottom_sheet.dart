@@ -56,7 +56,7 @@ class MenuBottomSheet extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    role == 'student' ? "Menu de Estudiante" : "Menú ${role[0].toUpperCase()}${role.substring(1)}",
+                    _getMenuTitle(role),
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: AppTheme.primary,
@@ -125,6 +125,21 @@ class MenuBottomSheet extends StatelessWidget {
     );
   }
 
+  String _getMenuTitle(String role) {
+    switch (role.toLowerCase()) {
+      case 'student': return "Menú de Estudiante";
+      case 'professor': return "Menú de Profesor";
+      case 'admin': return "Menú de Administrador";
+      case 'security': return "Menú de Seguridad";
+      case 'secretaria':
+      case 'secretary': return "Menú de Secretaría";
+      case 'coordinador':
+      case 'coordinator': return "Menú de Coordinación";
+      case 'auditor': return "Menú de Auditoría";
+      default: return "Menú de Usuario";
+    }
+  }
+
   List<Map<String, dynamic>> _getMenuSectionsForRole(BuildContext context, String role) {
     void nav(Widget screen) {
       Navigator.pop(context); // Close sheet before navigating
@@ -168,6 +183,13 @@ class MenuBottomSheet extends StatelessWidget {
           {
             'title': 'SEGURIDAD & OTROS',
             'items': [
+              {'icon': Icons.badge_outlined, 'label': 'Carnet Digital', 'onTap': () {
+                 if (hasData) {
+                   nav(CarnetScreen(userData: {...userData!, 'rol': 'Estudiante'}));
+                 } else {
+                   notImpl();
+                 }
+              }},
               {'icon': Icons.qr_code_scanner, 'label': 'Escanear QR', 'onTap': () {
                  if (hasData && userData!['idEstudiante'] != null) {
                     nav(QRScanScreen(studentId: userData!['idEstudiante']));
@@ -219,6 +241,18 @@ class MenuBottomSheet extends StatelessWidget {
                {'icon': Icons.chat, 'label': 'Chats', 'onTap': notImpl},
                {'icon': Icons.campaign, 'label': 'Anuncios', 'onTap': notImpl},
              ]
+          },
+          {
+            'title': 'IDENTIFICACIÓN',
+            'items': [
+              {'icon': Icons.badge_outlined, 'label': 'Carnet Digital', 'onTap': () {
+                 if (hasData) {
+                   nav(CarnetScreen(userData: {...userData!, 'rol': 'Profesor'}));
+                 } else {
+                   notImpl();
+                 }
+              }},
+            ]
           }
         ];
       case 'admin':
@@ -236,6 +270,18 @@ class MenuBottomSheet extends StatelessWidget {
                {'icon': Icons.bar_chart, 'label': 'Estadísticas', 'onTap': notImpl},
                {'icon': Icons.file_download, 'label': 'Exportar', 'onTap': notImpl},
              ]
+          },
+          {
+            'title': 'IDENTIFICACIÓN',
+            'items': [
+              {'icon': Icons.badge_outlined, 'label': 'Carnet Digital', 'onTap': () {
+                 if (hasData) {
+                   nav(CarnetScreen(userData: {...userData!, 'rol': 'Admin'}));
+                 } else {
+                   notImpl();
+                 }
+              }},
+            ]
           }
         ];
       case 'security':
@@ -245,11 +291,6 @@ class MenuBottomSheet extends StatelessWidget {
             'items': [
                {'icon': Icons.qr_code_scanner, 'label': 'Escanear', 'onTap': () => nav(const SecurityQRScreen())},
                {'icon': Icons.history, 'label': 'Historial', 'onTap': () {
-                  // Navigate to history tab in dashboard
-                  Navigator.pop(context);
-                  // We need a way to tell the dashboard to switch tabs,
-                  // or just navigate to a full screen history.
-                  // For now, let's keep it simple or implement a standalone screen.
                   notImpl();
                }},
                {'icon': Icons.lock_open, 'label': 'Apertura Aulas', 'onTap': () => nav(const ClassroomOpeningScreen())},
@@ -269,7 +310,91 @@ class MenuBottomSheet extends StatelessWidget {
                   }
                }},
              ]
-           }
+           },
+           {
+            'title': 'IDENTIFICACIÓN',
+            'items': [
+              {'icon': Icons.badge_outlined, 'label': 'Carnet Digital', 'onTap': () {
+                 if (hasData) {
+                   nav(CarnetScreen(userData: {...userData!, 'rol': 'Seguridad'}));
+                 } else {
+                   notImpl();
+                 }
+              }},
+            ]
+          }
+        ];
+      case 'secretaria':
+      case 'secretary':
+        return [
+          {
+            'title': 'GESTIÓN',
+            'items': [
+              {'icon': Icons.point_of_sale, 'label': 'Aranceles', 'onTap': () {
+                // If it's already in the dashboard, maybe just close the sheet
+                Navigator.pop(context);
+              }},
+              {'icon': Icons.description, 'label': 'Reportes', 'onTap': () {
+                nav(const ReporteAsistenciaDocenteScreen());
+              }},
+            ]
+          },
+          {
+            'title': 'IDENTIFICACIÓN',
+            'items': [
+              {'icon': Icons.badge_outlined, 'label': 'Carnet Digital', 'onTap': () {
+                 if (hasData) {
+                   nav(CarnetScreen(userData: {...userData!, 'rol': 'Secretaria'}));
+                 } else {
+                   notImpl();
+                 }
+              }},
+            ]
+          }
+        ];
+      case 'coordinador':
+      case 'coordinator':
+        return [
+          {
+            'title': 'COORDINACIÓN',
+            'items': [
+               {'icon': Icons.campaign, 'label': 'Anuncios', 'onTap': () => nav(const AnunciosAdminScreen())},
+               {'icon': Icons.chat, 'label': 'Chats', 'onTap': () => nav(const InboxScreen())},
+            ]
+          },
+          {
+            'title': 'IDENTIFICACIÓN',
+            'items': [
+              {'icon': Icons.badge_outlined, 'label': 'Carnet Digital', 'onTap': () {
+                 if (hasData) {
+                   nav(CarnetScreen(userData: {...userData!, 'rol': 'Coordinador'}));
+                 } else {
+                   notImpl();
+                 }
+              }},
+            ]
+          }
+        ];
+      case 'auditor':
+        return [
+          {
+            'title': 'AUDITORÍA',
+            'items': [
+              {'icon': Icons.history, 'label': 'Logs', 'onTap': () => nav(const AuditoriaMainScreen())},
+            ]
+          },
+          {
+            'title': 'IDENTIFICACIÓN',
+            'items': [
+              {'icon': Icons.badge_outlined, 'label': 'Carnet Digital', 'onTap': () {
+                 if (hasData) {
+                   nav(CarnetScreen(userData: {...userData!, 'rol': 'Auditor'}));
+                 } else {
+                   notImpl();
+                 }
+              }},
+            ]
+          }
         ];
       default:
         return [];

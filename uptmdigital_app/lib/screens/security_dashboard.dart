@@ -20,8 +20,10 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
   int _currentIndex = 0;
   List<dynamic> _solicitudes = [];
   List<dynamic> _historial = [];
+  Map<String, dynamic>? _userData;
   bool _isLoadingSolicitudes = false;
   bool _isLoadingHistorial = false;
+  bool _isLoadingUser = true;
   Timer? _pollingTimer;
 
   @override
@@ -30,7 +32,18 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
     // Wake up server immediately if not already done
     ApiService().getHealth();
     _loadAllData();
+    _loadUserData();
     _startPolling();
+  }
+
+  Future<void> _loadUserData() async {
+    final data = await ApiService().getUserMe();
+    if (mounted) {
+      setState(() {
+        _userData = data;
+        _isLoadingUser = false;
+      });
+    }
   }
 
   void _loadAllData() {
@@ -175,7 +188,7 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
           showModalBottomSheet(
             context: context,
             backgroundColor: Colors.transparent,
-            builder: (context) => const MenuBottomSheet(role: 'security'),
+            builder: (context) => MenuBottomSheet(role: 'security', userData: _userData),
           );
         },
         backgroundColor: AppTheme.secondary,

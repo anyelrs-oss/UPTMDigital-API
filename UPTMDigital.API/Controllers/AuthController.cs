@@ -156,6 +156,10 @@ namespace UPTMDigital.API.Controllers
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterDto register)
         {
+            // 0. Basic Validation
+            if (string.IsNullOrEmpty(register.Cedula))
+                return BadRequest(new { Message = "La cédula es obligatoria para el registro." });
+
             // 1. Check if user already exists
             if (await _context.Usuarios.AnyAsync(u => u.NombreUsuario == register.Username))
                 return BadRequest(new { Message = "El nombre de usuario ya está en uso." });
@@ -246,6 +250,46 @@ namespace UPTMDigital.API.Controllers
                 Rol = roleName,
                 Nombres = institutionalRecord.Nombres,
                 Apellidos = institutionalRecord.Apellidos
+            });
+        }
+        [Authorize]
+        [HttpGet("me")]
+        public async Task<IActionResult> GetMe()
+        {
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out int userId))
+                return Unauthorized();
+
+            var usuario = await _context.Usuarios
+                .Include(u => u.Rol)
+                .FirstOrDefaultAsync(u => u.IdUsuario == userId);
+
+            if (usuario == null) return NotFound();
+
+            // Enriquecer con perfil según rol
+            object? perfil = null;
+            var roleName = usuario.Rol?.NombreRol;
+
+            if (roleName == "Estudiante")
+            {
+                perfil = await _context.Estudiantes.FirstOrDefaultAsync(e => e.UsuarioId == userId);
+            }
+            else if (roleName == "Profesor")
+            {
+                perfil = await _context.Profesores.FirstOrDefaultAsync(p => p.UsuarioId == userId);
+            }
+            else if (roleName == "Coordinador")
+            {
+                perfil = await _context.Coordinadores.Include(c => c.Carrera).FirstOrDefaultAsync(c => c.UsuarioId == userId);
+            }
+
+            return Ok(new
+            {
+                usuario.IdUsuario,
+                usuario.NombreUsuario,
+                usuario.Cedula,
+                Rol = roleName,
+                Perfil = perfil
             });
         }
     }

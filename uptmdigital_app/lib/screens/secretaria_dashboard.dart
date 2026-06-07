@@ -4,6 +4,7 @@ import 'package:uptmdigital_app/theme.dart';
 import 'package:uptmdigital_app/widgets/institutional_card.dart';
 import 'package:uptmdigital_app/screens/login_screen.dart';
 import 'package:uptmdigital_app/screens/reporte_asistencia_docente_screen.dart';
+import 'package:uptmdigital_app/widgets/menu_bottom_sheet.dart';
 import 'dart:convert';
 
 class SecretariaDashboard extends StatefulWidget {
@@ -18,12 +19,23 @@ class _SecretariaDashboardState extends State<SecretariaDashboard> {
   final _facturaCtrl = TextEditingController();
   bool _isOfflineMode = false;
   List<Map<String, String>> _pendingSync = [];
+  Map<String, dynamic>? _userData;
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
     _loadOfflineData();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    final data = await ApiService().getUserMe();
+    if (mounted) {
+      setState(() {
+        _userData = data;
+      });
+    }
   }
 
   Future<void> _loadOfflineData() async {
@@ -218,6 +230,17 @@ class _SecretariaDashboardState extends State<SecretariaDashboard> {
             ),
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          showModalBottomSheet(
+            context: context,
+            backgroundColor: Colors.transparent,
+            builder: (context) => MenuBottomSheet(role: 'secretaria', userData: _userData),
+          );
+        },
+        backgroundColor: AppTheme.secondary,
+        child: const Icon(Icons.apps, color: Colors.white),
       ),
     );
   }

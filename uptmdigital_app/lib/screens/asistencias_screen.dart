@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:uptmdigital_app/services/api_service.dart';
 import 'package:uptmdigital_app/widgets/search_filter_bar.dart';
 
+import 'package:uptmdigital_app/utils/export_helper.dart';
+
 class AsistenciasScreen extends StatefulWidget {
   final int? professorId;
   const AsistenciasScreen({super.key, this.professorId});
@@ -32,6 +34,35 @@ class _AsistenciasScreenState extends State<AsistenciasScreen> {
     }
   }
 
+  void _exportarExcel() async {
+    final headers = ["Estudiante", "Cédula", "Asignatura", "Fecha", "Estado"];
+    final rows = _asistencias.map((a) {
+      final student = a['estudiante'] != null ? "${a['estudiante']['nombres']} ${a['estudiante']['apellidos']}" : "N/A";
+      final cedula = a['estudiante'] != null ? a['estudiante']['cedula'] : "N/A";
+      final subject = a['asignatura'] != null ? a['asignatura']['nombre'] : "N/A";
+      final date = a['fecha'].split('T')[0];
+      return [student, cedula, subject, date, a['estado']];
+    }).toList();
+
+    await ExportHelper.exportToExcel(fileName: "Reporte_Asistencias", headers: headers, rows: rows);
+  }
+
+  void _exportarPDF() async {
+    final headers = ["Estudiante", "Cédula", "Fecha", "Estado"];
+    final data = _asistencias.map((a) {
+      final student = a['estudiante'] != null ? "${a['estudiante']['nombres']} ${a['estudiante']['apellidos']}" : "N/A";
+      final cedula = a['estudiante'] != null ? a['estudiante']['cedula'] : "N/A";
+      final date = a['fecha'].split('T')[0];
+      return [student, cedula, date, a['estado'].toString()];
+    }).toList();
+
+    await ExportHelper.exportToPDF(
+      title: "Control de Asistencia Estudiantil",
+      headers: headers,
+      data: data,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isAdmin = widget.professorId == null;
@@ -39,17 +70,17 @@ class _AsistenciasScreenState extends State<AsistenciasScreen> {
       appBar: AppBar(
         title: const Text("Control de Asistencia"),
         actions: [
-          if (isAdmin)
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.download),
-              onSelected: (val) {
-                 // Implement export
-              },
-              itemBuilder: (ctx) => [
-                const PopupMenuItem(value: 'pdf', child: Text("Exportar PDF")),
-                const PopupMenuItem(value: 'excel', child: Text("Exportar Excel")),
-              ],
-            )
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.download),
+            onSelected: (val) {
+               if (val == 'pdf') _exportarPDF();
+               if (val == 'excel') _exportarExcel();
+            },
+            itemBuilder: (ctx) => [
+              const PopupMenuItem(value: 'pdf', child: Text("Exportar PDF")),
+              const PopupMenuItem(value: 'excel', child: Text("Exportar Excel")),
+            ],
+          )
         ],
       ),
       body: Column(

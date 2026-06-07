@@ -81,16 +81,64 @@ namespace UPTMDigital.API.Controllers
             return NoContent();
         }
 
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteNota(int id)
+        [HttpPost("masivo")]
+        public async Task<IActionResult> PostNotasMasivo([FromBody] NotasMasivasDto dto)
         {
-            var nota = await _context.Notas.FindAsync(id);
-            if (nota == null) return NotFound();
-            _context.Notas.Remove(nota);
+            if (dto.EvaluacionId <= 0) return BadRequest("ID de evaluación inválido.");
+            if (dto.Notas == null || !dto.Notas.Any()) return BadRequest("No se proporcionaron notas.");
+
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            int? profesorId = null;
+            if (int.TryParse(userIdStr, out var userId))
+            {
+                var prof = await _context.Profesores.FirstOrDefaultAsync(p => p.UsuarioId == userId);
+                profesorId = prof?.IdProfesor;
+            }
+
+            foreach (var item in dto.Notas)
+            {
+                // Buscar si ya existe una nota para este estudiante y esta evaluación para actualizarla
+                var notaExistente = await _context.Notas
+                    .FirstOrDefaultAsync(n => n.EstudianteId == item.EstudianteId && n.EvaluacionId == dto.EvaluacionId);
+
+                if (notaExistente != null)
+                {
+                    notaExistente.Calificacion = item.Calificacion;
+                    notaExistente.Fecha = DateTime.Now;
+                    notaExistente.ProfesorId = profesorId;
+                }
+                else
+                {
+                    var nuevaNota = new Nota
+                    {
+                        AsignaturaId = dto.AsignaturaId,
+                        EstudianteId = item.EstudianteId,
+                        EvaluacionId = dto.EvaluacionId,
+                        Calificacion = item.Calificacion,
+                        Fecha = DateTime.Now,
+                        ProfesorId = profesorId
+                    };
+                    _context.Notas.Add(nuevaNota);
+                }
+            }
+
             await _context.SaveChangesAsync();
-            return NoContent();
+            return Ok(new { message = $"Se procesaron {dto.Notas.Count} notas exitosamente." });
         }
 
         private bool NotaExists(int id) => _context.Notas.Any(e => e.IdNota == id);
+    }
+
+    public class NotasMasivasDto
+    {
+        public int AsignaturaId { get; set; }
+        public int EvaluacionId { get; set; }
+        public List<NotaItemDto> Notas { get; set; } = new();
+    }
+
+    public class NotaItemDto
+    {
+        public int EstudianteId { get; set; }
+        public decimal Calificacion { get; set; }
     }
 }
