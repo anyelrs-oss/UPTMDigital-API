@@ -180,8 +180,8 @@ class _EstudiantesScreenState extends State<EstudiantesScreen> {
               CircleAvatar(
                 radius: 28,
                 backgroundColor: AppTheme.primary.withValues(alpha: 0.1),
-                backgroundImage: e.profileImageUrl != null ? NetworkImage(e.profileImageUrl!) : null,
-                child: e.profileImageUrl == null
+                backgroundImage: (e.profileImageUrl != null && e.profileImageUrl!.isNotEmpty) ? NetworkImage(e.profileImageUrl!) : null,
+                child: (e.profileImageUrl == null || e.profileImageUrl!.isEmpty)
                   ? Text(
                       e.nombres.isNotEmpty ? e.nombres[0].toUpperCase() : "?",
                       style: const TextStyle(
@@ -257,8 +257,8 @@ class _EstudiantesScreenState extends State<EstudiantesScreen> {
                 CircleAvatar(
                   radius: 50,
                   backgroundColor: AppTheme.primary.withValues(alpha: 0.1),
-                  backgroundImage: e.profileImageUrl != null ? NetworkImage(e.profileImageUrl!) : null,
-                  child: e.profileImageUrl == null ? const Icon(Icons.person, size: 50, color: AppTheme.primary) : null,
+                  backgroundImage: (e.profileImageUrl != null && e.profileImageUrl!.isNotEmpty) ? NetworkImage(e.profileImageUrl!) : null,
+                  child: (e.profileImageUrl == null || e.profileImageUrl!.isEmpty) ? const Icon(Icons.person, size: 50, color: AppTheme.primary) : null,
                 ),
                 if (e.profileImageUrl != null)
                   Positioned(

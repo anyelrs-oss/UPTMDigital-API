@@ -132,7 +132,9 @@ class _StudentFormScreenState extends State<StudentFormScreen> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: _carreraController.text.isNotEmpty ? _carreraController.text : null,
+                value: (_carrerasList.any((c) => c['idCarrera']?.toString() == _carreraController.text)) 
+                    ? _carreraController.text 
+                    : null,
                 decoration: const InputDecoration(labelText: 'Carrera'),
                 items: _carrerasList.map<DropdownMenuItem<String>>((item) {
                   return DropdownMenuItem<String>(

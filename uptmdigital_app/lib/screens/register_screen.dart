@@ -80,15 +80,46 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (result['success'] == true) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(result['message'] ?? '¡Registro exitoso!'),
+          content: Text(result['message'] ?? '¡Registro exitoso! Iniciando sesión...'),
           backgroundColor: Colors.green,
           duration: const Duration(seconds: 3),
         ),
       );
       Navigator.pop(context); // Volver al Login
     } else {
-      _showError(result['message'] ?? 'Error en el registro.');
+      if (result['isTimeout'] == true) {
+        // Manejo especial para timeout: el usuario podría haberse creado
+        _showTimeoutDialog(result['message']);
+      } else {
+        _showError(result['message'] ?? 'Error en el registro.');
+      }
     }
+  }
+
+  void _showTimeoutDialog(String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.access_time, color: Colors.orange),
+            SizedBox(width: 10),
+            Text("Procesando..."),
+          ],
+        ),
+        content: Text(message),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.pop(context); // Volver al login
+            },
+            child: const Text("IR AL LOGIN"),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showError(String msg) {

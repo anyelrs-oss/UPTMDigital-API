@@ -49,6 +49,18 @@ class _StudentDashboardState extends State<StudentDashboard> {
 
     // 2. Cargar de la red en segundo plano para actualizar
     final data = await api.getUserMe();
+    
+    // Si getUserMe no tiene el perfil (Fase 8: fallback por si el backend no linkeó bien /me)
+    if (mounted && data != null && data['idEstudiante'] == null) {
+      debugPrint("Dashboard: idEstudiante null en /me, intentando /estudiantes/me");
+      final studentProfile = await api.getStudentMe();
+      if (studentProfile != null) {
+        data.addAll(studentProfile);
+        // Volver a guardar en caché con el perfil completo
+        await api.storage.write(key: 'cached_user_me', value: jsonEncode(data));
+      }
+    }
+
     if (mounted && data != null) {
       setState(() {
         _studentData = data;
@@ -97,7 +109,13 @@ class _StudentDashboardState extends State<StudentDashboard> {
     setState(() => _isLoading = true);
 
     final file = File(image.path);
-    final fileName = "profile_std_${_studentData!['idEstudiante']}.jpg";
+    final idEstudiante = _studentData!['idEstudiante'];
+    if (idEstudiante == null) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Error: ID de estudiante no encontrado")));
+      setState(() => _isLoading = false);
+      return;
+    }
+    final fileName = "profile_std_$idEstudiante.jpg";
 
     final url = await SupabaseService().uploadImage(file, fileName);
 
@@ -127,26 +145,49 @@ class _StudentDashboardState extends State<StudentDashboard> {
       );
     }
 
-    if (_studentData == null) {
+    final studentId = _studentData?['idEstudiante'];
+    if (studentId == null) {
       return Scaffold(
+        appBar: AppBar(title: const Text("Error de Perfil")),
         body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text("Error al cargar perfil."),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () async {
-                  await ApiService().logout();
-                  if (context.mounted) {
-                    Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(builder: (_) => const LoginScreen()),
-                    );
-                  }
-                },
-                child: const Text("Cerrar Sesión"),
-              ),
-            ],
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                const SizedBox(height: 16),
+                const Text(
+                  "Tu usuario no tiene un perfil de estudiante vinculado o hubo un error al cargar los datos.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 16),
+                ),
+                if (_studentData != null) ...[
+                   const SizedBox(height: 8),
+                   Text(
+                     "ID Usuario: ${_studentData!['idUsuario']} | Cédula: ${_studentData!['cedula']}",
+                     style: const TextStyle(fontSize: 12, color: Colors.grey),
+                   ),
+                ],
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: () => _loadStudentData(),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text("Reintentar"),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    await ApiService().logout();
+                    if (context.mounted) {
+                      Navigator.of(context).pushReplacement(
+                        MaterialPageRoute(builder: (_) => const LoginScreen()),
+                      );
+                    }
+                  },
+                  child: const Text("Cerrar Sesión"),
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -332,10 +373,10 @@ class _StudentDashboardState extends State<StudentDashboard> {
                  children: [
                    CircleAvatar(
                     radius: 50,
-                    backgroundImage: _studentData!['fotoUrl'] != null
+                    backgroundImage: (_studentData!['fotoUrl'] != null && _studentData!['fotoUrl'].toString().isNotEmpty)
                         ? NetworkImage(_studentData!['fotoUrl'])
                         : null,
-                    child: _studentData!['fotoUrl'] == null
+                    child: (_studentData!['fotoUrl'] == null || _studentData!['fotoUrl'].toString().isEmpty)
                         ? const Icon(Icons.person, size: 50)
                         : null,
                   ),

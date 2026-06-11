@@ -127,16 +127,30 @@ class ApiService {
     String password,
   ) async {
     try {
+      // Aumentamos el timeout específicamente para el registro debido a la vinculación de perfiles
       final response = await _dio.post(
         '/api/auth/register',
         data: {'cedula': cedula, 'username': username, 'contrasena': password},
+        options: Options(
+          sendTimeout: const Duration(seconds: 15),
+          receiveTimeout: const Duration(seconds: 15),
+        ),
       );
 
       if (response.statusCode == 200) {
+        debugPrint('Registro exitoso: ${response.data}');
         return {'success': true, ...response.data};
       }
       return {'success': false, 'message': 'Error desconocido'};
     } on DioException catch (e) {
+      debugPrint('Error en registro (Dio): ${e.type} - ${e.message}');
+      if (e.type == DioExceptionType.connectionTimeout || e.type == DioExceptionType.receiveTimeout) {
+        return {
+          'success': false, 
+          'message': 'El servidor está tardando mucho en vincular su perfil. Por favor, intente iniciar sesión en unos momentos.',
+          'isTimeout': true
+        };
+      }
       if (e.response != null) {
         return {
           'success': false,
