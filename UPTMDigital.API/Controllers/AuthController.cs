@@ -104,8 +104,12 @@ namespace UPTMDigital.API.Controllers
 
         private string GenerarToken(Models.Usuario usuario)
         {
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(
-                _config["Jwt:Key"] ?? "MiClaveSuperSecretaDe32Caracteres1234"));
+            var jwtKey = _config["Jwt:Key"];
+            if (string.IsNullOrEmpty(jwtKey))
+            {
+                jwtKey = "MiClaveSuperSecretaDe32Caracteres1234";
+            }
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
 
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 

@@ -72,8 +72,12 @@ builder.Services.AddDbContext<NominaContext>(options =>
     ConfigurePostgres(options, nominaConnStr ?? string.Empty));
 
 // 2. Configuración JWT
-var key = Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]
-    ?? "MiClaveSuperSecretaDe32Caracteres1234");
+var jwtKey = builder.Configuration["Jwt:Key"];
+if (string.IsNullOrEmpty(jwtKey))
+{
+    jwtKey = "MiClaveSuperSecretaDe32Caracteres1234";
+}
+var key = Encoding.UTF8.GetBytes(jwtKey);
 
 builder.Services.AddAuthentication(x =>
 {
