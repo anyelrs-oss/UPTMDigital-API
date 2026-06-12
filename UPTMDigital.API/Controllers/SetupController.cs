@@ -1255,17 +1255,25 @@ namespace UPTMDigital.API.Controllers
             try
             {
                 // ═══════════════════════════════════════════════════════
-                // FASE 0: APLICAR MIGRACIONES PENDIENTES
+                // FASE 0: ASEGURAR ESQUEMA (RAW SQL — no depende de migraciones)
                 // ═══════════════════════════════════════════════════════
-                try
+                var schemaFixes = new[]
                 {
-                    await _context.Database.MigrateAsync();
-                    log.Add("✅ FASE 0: Migraciones pendientes aplicadas.");
-                }
-                catch (Exception exMig)
+                    "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Coordinador' AND column_name='Apellidos') THEN ALTER TABLE \"Coordinador\" ADD COLUMN \"Apellidos\" text; END IF; END $$;",
+                    "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Coordinador' AND column_name='Nombres') THEN ALTER TABLE \"Coordinador\" ADD COLUMN \"Nombres\" text; END IF; END $$;",
+                    "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Nota' AND column_name='EvaluacionId') THEN ALTER TABLE \"Nota\" ADD COLUMN \"EvaluacionId\" integer; END IF; END $$;",
+                    "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Nota' AND column_name='ProfesorId') THEN ALTER TABLE \"Nota\" ADD COLUMN \"ProfesorId\" integer; END IF; END $$;",
+                    "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='PinAsistencia' AND column_name='CarreraId') THEN ALTER TABLE \"PinAsistencia\" ADD COLUMN \"CarreraId\" integer; END IF; END $$;",
+                    "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Mensaje' AND column_name='CarreraId') THEN ALTER TABLE \"Mensaje\" ADD COLUMN \"CarreraId\" integer; END IF; END $$;",
+                    "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Anuncio' AND column_name='Trimestre') THEN ALTER TABLE \"Anuncio\" ADD COLUMN \"Trimestre\" text; END IF; END $$;",
+                    "CREATE TABLE IF NOT EXISTS \"GlobalSetting\" (\"Clave\" text NOT NULL PRIMARY KEY, \"Valor\" text NOT NULL, \"UltimaActualizacion\" timestamp with time zone NOT NULL);",
+                };
+                foreach (var sql in schemaFixes)
                 {
-                    log.Add($"⚠️ Migraciones: {exMig.Message}");
+                    try { await _context.Database.ExecuteSqlRawAsync(sql); }
+                    catch (Exception exSql) { log.Add($"⚠️ Schema fix: {exSql.Message}"); }
                 }
+                log.Add("✅ FASE 0: Esquema verificado/actualizado.");
 
                 await strategy.ExecuteAsync(async () =>
                 {

@@ -7,6 +7,7 @@ COPY ["UPTMDigital.API.csproj", "./"]
 RUN dotnet restore "UPTMDigital.API.csproj"
 
 # Copia el resto de los archivos y genera la publicación
+ARG CACHEBUST=1
 COPY . .
 RUN dotnet publish "UPTMDigital.API.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
