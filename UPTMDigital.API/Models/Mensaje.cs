@@ -10,7 +10,7 @@ namespace UPTMDigital.API.Models
         public int IdMensaje { get; set; }
 
         // --- FK Normalizadas ---
-        public int AsignaturaId { get; set; }
+        public int? AsignaturaId { get; set; }
         [ForeignKey("AsignaturaId")]
         public Asignatura? Asignatura { get; set; }
 

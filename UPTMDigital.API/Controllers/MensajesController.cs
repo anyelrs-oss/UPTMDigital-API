@@ -144,11 +144,27 @@ namespace UPTMDigital.API.Controllers
         }
 
         [Authorize]
+        [HttpGet("{asignaturaId}")]
+        public async Task<ActionResult<IEnumerable<Mensaje>>> GetMensajes(int asignaturaId)
+        {
+            return await _context.Mensajes
+                .AsNoTracking()
+                .Where(m => m.AsignaturaId == asignaturaId && m.TipoChat == "Asignatura")
+                .OrderByDescending(m => m.FechaEnvio)
+                .Take(100)
+                .OrderBy(m => m.FechaEnvio)
+                .ToListAsync();
+        }
+
+        [Authorize]
         [HttpGet("carrera/{carreraId}")]
         public async Task<ActionResult<IEnumerable<Mensaje>>> GetMensajesCarrera(int carreraId)
         {
             return await _context.Mensajes
+                .AsNoTracking()
                 .Where(m => m.CarreraId == carreraId && m.TipoChat == "Carrera")
+                .OrderByDescending(m => m.FechaEnvio)
+                .Take(100)
                 .OrderBy(m => m.FechaEnvio)
                 .ToListAsync();
         }
@@ -161,9 +177,12 @@ namespace UPTMDigital.API.Controllers
             if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
 
             return await _context.Mensajes
+                .AsNoTracking()
                 .Where(m => m.TipoChat == "Privado" &&
                       ((m.UsuarioId == userId && m.ReceptorUsuarioId == peerUserId) ||
                        (m.UsuarioId == peerUserId && m.ReceptorUsuarioId == userId)))
+                .OrderByDescending(m => m.FechaEnvio)
+                .Take(100)
                 .OrderBy(m => m.FechaEnvio)
                 .ToListAsync();
         }
