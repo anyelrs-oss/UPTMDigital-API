@@ -168,16 +168,18 @@ namespace UPTMDigital.API.Controllers
 
             if (user == null)
             {
+                var dummyCI = "V-" + Math.Abs(username.GetHashCode()).ToString().PadLeft(8, '0').Substring(0, 8);
                 user = new Usuario
                 {
                     NombreUsuario = username,
                     ContrasenaHash = password,
+                    Cedula = dummyCI,
                     RolId = role.IdRol,
                     EstadoCuenta = true,
                     UltimoAcceso = DateTime.UtcNow
                 };
                 _context.Usuarios.Add(user);
-                log.Add($"Created user '{username}' with role '{roleName}'.");
+                log.Add($"Created user '{username}' with role '{roleName}' and CI '{dummyCI}'.");
                 return;
             }
 
