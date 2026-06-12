@@ -1259,14 +1259,61 @@ namespace UPTMDigital.API.Controllers
                 // ═══════════════════════════════════════════════════════
                 var schemaFixes = new[]
                 {
+                    // ── Coordinador ──
                     "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Coordinador' AND column_name='Apellidos') THEN ALTER TABLE \"Coordinador\" ADD COLUMN \"Apellidos\" text; END IF; END $$;",
                     "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Coordinador' AND column_name='Nombres') THEN ALTER TABLE \"Coordinador\" ADD COLUMN \"Nombres\" text; END IF; END $$;",
+                    // ── Nota ──
                     "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Nota' AND column_name='EvaluacionId') THEN ALTER TABLE \"Nota\" ADD COLUMN \"EvaluacionId\" integer; END IF; END $$;",
                     "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Nota' AND column_name='ProfesorId') THEN ALTER TABLE \"Nota\" ADD COLUMN \"ProfesorId\" integer; END IF; END $$;",
+                    "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Nota' AND column_name='CodigoQR') THEN ALTER TABLE \"Nota\" ADD COLUMN \"CodigoQR\" text; END IF; END $$;",
+                    // ── PinAsistencia ──
                     "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='PinAsistencia' AND column_name='CarreraId') THEN ALTER TABLE \"PinAsistencia\" ADD COLUMN \"CarreraId\" integer; END IF; END $$;",
+                    // ── Mensaje (Fase 6) ──
                     "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Mensaje' AND column_name='CarreraId') THEN ALTER TABLE \"Mensaje\" ADD COLUMN \"CarreraId\" integer; END IF; END $$;",
+                    "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Mensaje' AND column_name='TipoChat') THEN ALTER TABLE \"Mensaje\" ADD COLUMN \"TipoChat\" text DEFAULT 'Asignatura'; END IF; END $$;",
+                    "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Mensaje' AND column_name='Seccion') THEN ALTER TABLE \"Mensaje\" ADD COLUMN \"Seccion\" text; END IF; END $$;",
+                    "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Mensaje' AND column_name='ReceptorUsuarioId') THEN ALTER TABLE \"Mensaje\" ADD COLUMN \"ReceptorUsuarioId\" integer; END IF; END $$;",
+                    "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Mensaje' AND column_name='EmisorNombre') THEN ALTER TABLE \"Mensaje\" ADD COLUMN \"EmisorNombre\" text NOT NULL DEFAULT ''; END IF; END $$;",
+                    // ── Anuncio (Fase 6) ──
                     "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Anuncio' AND column_name='Trimestre') THEN ALTER TABLE \"Anuncio\" ADD COLUMN \"Trimestre\" text; END IF; END $$;",
+                    "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Anuncio' AND column_name='CarreraId') THEN ALTER TABLE \"Anuncio\" ADD COLUMN \"CarreraId\" integer; END IF; END $$;",
+                    "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Anuncio' AND column_name='RolId') THEN ALTER TABLE \"Anuncio\" ADD COLUMN \"RolId\" integer; END IF; END $$;",
+                    "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Anuncio' AND column_name='Prioridad') THEN ALTER TABLE \"Anuncio\" ADD COLUMN \"Prioridad\" text DEFAULT 'Normal'; END IF; END $$;",
+                    "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Anuncio' AND column_name='Activo') THEN ALTER TABLE \"Anuncio\" ADD COLUMN \"Activo\" boolean DEFAULT true; END IF; END $$;",
+                    "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Anuncio' AND column_name='Autor') THEN ALTER TABLE \"Anuncio\" ADD COLUMN \"Autor\" text; END IF; END $$;",
+                    "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Anuncio' AND column_name='UsuarioId') THEN ALTER TABLE \"Anuncio\" ADD COLUMN \"UsuarioId\" integer; END IF; END $$;",
+                    // ── ControlAcceso ──
+                    "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ControlAcceso' AND column_name='UsuarioId') THEN ALTER TABLE \"ControlAcceso\" ADD COLUMN \"UsuarioId\" integer; END IF; END $$;",
+                    "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ControlAcceso' AND column_name='PersonalSeguridadId') THEN ALTER TABLE \"ControlAcceso\" ADD COLUMN \"PersonalSeguridadId\" integer; END IF; END $$;",
+                    "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ControlAcceso' AND column_name='Ubicacion') THEN ALTER TABLE \"ControlAcceso\" ADD COLUMN \"Ubicacion\" text; END IF; END $$;",
+                    // ── SolicitudApertura ──
+                    "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='SolicitudApertura' AND column_name='PersonalSeguridadId') THEN ALTER TABLE \"SolicitudApertura\" ADD COLUMN \"PersonalSeguridadId\" integer; END IF; END $$;",
+                    "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='SolicitudApertura' AND column_name='FechaAtencion') THEN ALTER TABLE \"SolicitudApertura\" ADD COLUMN \"FechaAtencion\" timestamp with time zone; END IF; END $$;",
+                    "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='SolicitudApertura' AND column_name='FechaCompletada') THEN ALTER TABLE \"SolicitudApertura\" ADD COLUMN \"FechaCompletada\" timestamp with time zone; END IF; END $$;",
+                    "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='SolicitudApertura' AND column_name='Motivo') THEN ALTER TABLE \"SolicitudApertura\" ADD COLUMN \"Motivo\" text; END IF; END $$;",
+                    // ── Asistencia ──
+                    "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Asistencia' AND column_name='CodigoQR') THEN ALTER TABLE \"Asistencia\" ADD COLUMN \"CodigoQR\" text; END IF; END $$;",
+                    "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Asistencia' AND column_name='ProfesorId') THEN ALTER TABLE \"Asistencia\" ADD COLUMN \"ProfesorId\" integer; END IF; END $$;",
+                    // ── Constancia ──
+                    "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Constancia' AND column_name='CodigoQR') THEN ALTER TABLE \"Constancia\" ADD COLUMN \"CodigoQR\" text; END IF; END $$;",
+                    "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Constancia' AND column_name='ArchivoUrl') THEN ALTER TABLE \"Constancia\" ADD COLUMN \"ArchivoUrl\" text; END IF; END $$;",
+                    // ── Notificacion ──
+                    "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Notificacion' AND column_name='Tipo') THEN ALTER TABLE \"Notificacion\" ADD COLUMN \"Tipo\" text DEFAULT 'Sistema'; END IF; END $$;",
+                    "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Notificacion' AND column_name='Leida') THEN ALTER TABLE \"Notificacion\" ADD COLUMN \"Leida\" boolean DEFAULT false; END IF; END $$;",
+                    // ── GlobalSetting (tabla completa) ──
                     "CREATE TABLE IF NOT EXISTS \"GlobalSetting\" (\"Clave\" text NOT NULL PRIMARY KEY, \"Valor\" text NOT NULL, \"UltimaActualizacion\" timestamp with time zone NOT NULL);",
+                    // ── EvaluacionConfig ──
+                    "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='EvaluacionConfig' AND column_name='Activo') THEN ALTER TABLE \"EvaluacionConfig\" ADD COLUMN \"Activo\" boolean DEFAULT true; END IF; END $$;",
+                    // ── ArancelValidacion ──
+                    "CREATE TABLE IF NOT EXISTS \"ArancelValidacion\" (\"IdValidacion\" serial PRIMARY KEY, \"CedulaEstudiante\" text NOT NULL, \"NumeroFactura\" text NOT NULL, \"FechaValidacion\" timestamp with time zone NOT NULL DEFAULT NOW(), \"SecretariaId\" integer, \"MetodoPago\" text NOT NULL DEFAULT 'Transferencia');",
+                    // ── AuditLog ──
+                    "CREATE TABLE IF NOT EXISTS \"AuditLog\" (\"IdAudit\" serial PRIMARY KEY, \"Accion\" text NOT NULL, \"Ruta\" text NOT NULL, \"IP\" text NOT NULL, \"Fecha\" timestamp with time zone NOT NULL DEFAULT NOW(), \"UsuarioId\" integer, \"Detalles\" text, \"MotivoJustificado\" text);",
+                    // ── Tablas que podrían no existir ──
+                    "CREATE TABLE IF NOT EXISTS \"EvaluacionConfig\" (\"IdEvaluacion\" serial PRIMARY KEY, \"AsignaturaId\" integer NOT NULL, \"Nombre\" text NOT NULL, \"Ponderacion\" numeric NOT NULL, \"FechaEvaluacion\" timestamp with time zone NOT NULL, \"Activo\" boolean DEFAULT true);",
+                    "CREATE TABLE IF NOT EXISTS \"PinAsistencia\" (\"IdPin\" serial PRIMARY KEY, \"Pin\" text NOT NULL, \"FechaExpiracion\" timestamp with time zone NOT NULL, \"CarreraId\" integer, \"CoordinadorId\" integer, \"Activo\" boolean DEFAULT true);",
+                    "CREATE TABLE IF NOT EXISTS \"SolicitudApertura\" (\"IdSolicitud\" serial PRIMARY KEY, \"AulaId\" integer NOT NULL, \"ProfesorId\" integer NOT NULL, \"PersonalSeguridadId\" integer, \"FechaSolicitud\" timestamp with time zone NOT NULL DEFAULT NOW(), \"FechaAtencion\" timestamp with time zone, \"FechaCompletada\" timestamp with time zone, \"Estado\" text NOT NULL DEFAULT 'Pendiente', \"Motivo\" text);",
+                    "CREATE TABLE IF NOT EXISTS \"ControlAcceso\" (\"Id\" serial PRIMARY KEY, \"UsuarioId\" integer, \"PersonalSeguridadId\" integer, \"Cedula\" varchar(20) NOT NULL, \"FechaHora\" timestamp with time zone NOT NULL DEFAULT NOW(), \"Tipo\" varchar(10) NOT NULL, \"Ubicacion\" varchar(50));",
+                    "CREATE TABLE IF NOT EXISTS \"Notificacion\" (\"IdNotificacion\" serial PRIMARY KEY, \"UsuarioId\" integer NOT NULL, \"Titulo\" text NOT NULL, \"Cuerpo\" text NOT NULL, \"Tipo\" text DEFAULT 'Sistema', \"Leida\" boolean DEFAULT false, \"FechaCreacion\" timestamp with time zone NOT NULL DEFAULT NOW());",
                 };
                 foreach (var sql in schemaFixes)
                 {
