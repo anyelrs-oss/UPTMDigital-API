@@ -1254,6 +1254,19 @@ namespace UPTMDigital.API.Controllers
 
             try
             {
+                // ═══════════════════════════════════════════════════════
+                // FASE 0: APLICAR MIGRACIONES PENDIENTES
+                // ═══════════════════════════════════════════════════════
+                try
+                {
+                    await _context.Database.MigrateAsync();
+                    log.Add("✅ FASE 0: Migraciones pendientes aplicadas.");
+                }
+                catch (Exception exMig)
+                {
+                    log.Add($"⚠️ Migraciones: {exMig.Message}");
+                }
+
                 await strategy.ExecuteAsync(async () =>
                 {
                     await using var tx = await _context.Database.BeginTransactionAsync();
