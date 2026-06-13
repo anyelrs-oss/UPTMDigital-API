@@ -10,8 +10,7 @@ namespace UPTMDigital.API.Models
         public int IdUsuario { get; set; }
         public string NombreUsuario { get; set; } = null!;
         public string ContrasenaHash { get; set; } = null!;
-        [Required]
-        public string Cedula { get; set; } = null!;
+        public string? Cedula { get; set; }
         public int RolId { get; set; }
         public bool EstadoCuenta { get; set; } = true;
         public DateTime? UltimoAcceso { get; set; }
