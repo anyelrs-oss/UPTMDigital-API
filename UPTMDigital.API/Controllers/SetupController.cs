@@ -131,10 +131,12 @@ namespace UPTMDigital.API.Controllers
                 });
             }
 
+            var dummyCI = "V-" + Math.Abs(payload.Username.GetHashCode()).ToString().PadLeft(8, '0').Substring(0, 8);
             var user = new Usuario
             {
                 NombreUsuario = payload.Username,
                 ContrasenaHash = payload.Password,
+                Cedula = dummyCI,
                 RolId = role.IdRol,
                 EstadoCuenta = true,
                 UltimoAcceso = DateTime.UtcNow
@@ -292,7 +294,7 @@ namespace UPTMDigital.API.Controllers
                 };
                 foreach (var (lg, ced, nom, ape, cor, dep, cod, tel) in profData) {
                     if (!await _context.Usuarios.AnyAsync(u => u.NombreUsuario == lg))
-                        _context.Usuarios.Add(new Usuario { NombreUsuario=lg, ContrasenaHash="123456", RolId=rolProf.IdRol, EstadoCuenta=true, UltimoAcceso=DateTime.UtcNow });
+                        _context.Usuarios.Add(new Usuario { NombreUsuario=lg, ContrasenaHash="123456", Cedula=ced, RolId=rolProf.IdRol, EstadoCuenta=true, UltimoAcceso=DateTime.UtcNow });
                 }
                 await _context.SaveChangesAsync();
                 foreach (var (lg, ced, nom, ape, cor, dep, cod, tel) in profData) {
@@ -314,7 +316,7 @@ namespace UPTMDigital.API.Controllers
                 };
                 foreach (var (lg, ced, nom, ape, cor, car, coda, dir, tel) in estData) {
                     if (!await _context.Usuarios.AnyAsync(u => u.NombreUsuario == lg))
-                        _context.Usuarios.Add(new Usuario { NombreUsuario=lg, ContrasenaHash="123456", RolId=rolEst.IdRol, EstadoCuenta=true, UltimoAcceso=DateTime.UtcNow });
+                        _context.Usuarios.Add(new Usuario { NombreUsuario=lg, ContrasenaHash="123456", Cedula=ced, RolId=rolEst.IdRol, EstadoCuenta=true, UltimoAcceso=DateTime.UtcNow });
                 }
                 await _context.SaveChangesAsync();
                 foreach (var (lg, ced, nom, ape, cor, car, coda, dir, tel) in estData) {
@@ -642,7 +644,7 @@ namespace UPTMDigital.API.Controllers
                         await _context.SaveChangesAsync();
                     }
 
-                    profesorUser = new Usuario { NombreUsuario = "profesor1", ContrasenaHash = "123456", RolId = rolProf.IdRol, EstadoCuenta = true, UltimoAcceso = DateTime.Now };
+                    profesorUser = new Usuario { NombreUsuario = "profesor1", ContrasenaHash = "123456", Cedula = "V-99999991", RolId = rolProf.IdRol, EstadoCuenta = true, UltimoAcceso = DateTime.Now };
                     _context.Usuarios.Add(profesorUser);
                     await _context.SaveChangesAsync();
                     log.Add("Created user 'profesor1'");
@@ -673,7 +675,7 @@ namespace UPTMDigital.API.Controllers
                     var rolEst = await _context.Roles.FirstOrDefaultAsync(r => r.NombreRol == "Estudiante");
                     if (rolEst != null)
                     {
-                        estudianteUser = new Usuario { NombreUsuario = "estudiante1", ContrasenaHash = "123456", RolId = rolEst.IdRol, EstadoCuenta = true, UltimoAcceso = DateTime.Now };
+                        estudianteUser = new Usuario { NombreUsuario = "estudiante1", ContrasenaHash = "123456", Cedula = "V-15000000", RolId = rolEst.IdRol, EstadoCuenta = true, UltimoAcceso = DateTime.Now };
                         _context.Usuarios.Add(estudianteUser);
                         await _context.SaveChangesAsync();
                         log.Add("Created user 'estudiante1'");
@@ -730,7 +732,7 @@ namespace UPTMDigital.API.Controllers
                     var rolProf = await _context.Roles.FirstOrDefaultAsync(r => r.NombreRol == "Profesor");
                     if (rolProf != null)
                     {
-                        prof2User = new Usuario { NombreUsuario = "profesor2", ContrasenaHash = "123456", RolId = rolProf.IdRol };
+                        prof2User = new Usuario { NombreUsuario = "profesor2", ContrasenaHash = "123456", Cedula = "V-22222222", RolId = rolProf.IdRol };
                         _context.Usuarios.Add(prof2User);
                         await _context.SaveChangesAsync();
                         log.Add("Created user 'profesor2'");
@@ -788,7 +790,7 @@ namespace UPTMDigital.API.Controllers
                     var rolEst = await _context.Roles.FirstOrDefaultAsync(r => r.NombreRol == "Estudiante");
                     if (rolEst != null)
                     {
-                        est2User = new Usuario { NombreUsuario = "estudiante2", ContrasenaHash = "123456", RolId = rolEst.IdRol };
+                        est2User = new Usuario { NombreUsuario = "estudiante2", ContrasenaHash = "123456", Cedula = "V-33333333", RolId = rolEst.IdRol };
                         _context.Usuarios.Add(est2User);
                         await _context.SaveChangesAsync();
                         log.Add("Created user 'estudiante2'");
@@ -816,7 +818,7 @@ namespace UPTMDigital.API.Controllers
                     var rolSeg = await _context.Roles.FirstOrDefaultAsync(r => r.NombreRol == "Seguridad");
                     if (rolSeg != null)
                     {
-                        seg1User = new Usuario { NombreUsuario = "seguridad1", ContrasenaHash = "123456", RolId = rolSeg.IdRol, EstadoCuenta = true, UltimoAcceso = DateTime.Now };
+                        seg1User = new Usuario { NombreUsuario = "seguridad1", ContrasenaHash = "123456", Cedula = "V-40000001", RolId = rolSeg.IdRol, EstadoCuenta = true, UltimoAcceso = DateTime.Now };
                         _context.Usuarios.Add(seg1User);
                         await _context.SaveChangesAsync();
                         log.Add("Created user 'seguridad1'");
