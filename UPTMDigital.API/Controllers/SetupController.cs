@@ -644,7 +644,7 @@ namespace UPTMDigital.API.Controllers
                         await _context.SaveChangesAsync();
                     }
 
-                    profesorUser = new Usuario { NombreUsuario = "profesor1", ContrasenaHash = "123456", Cedula = "V-99999991", RolId = rolProf.IdRol, EstadoCuenta = true, UltimoAcceso = DateTime.Now };
+                    profesorUser = new Usuario { NombreUsuario = "profesor1", ContrasenaHash = "123456", Cedula = "V-99999991", RolId = rolProf.IdRol, EstadoCuenta = true, UltimoAcceso = DateTime.UtcNow };
                     _context.Usuarios.Add(profesorUser);
                     await _context.SaveChangesAsync();
                     log.Add("Created user 'profesor1'");
@@ -675,7 +675,7 @@ namespace UPTMDigital.API.Controllers
                     var rolEst = await _context.Roles.FirstOrDefaultAsync(r => r.NombreRol == "Estudiante");
                     if (rolEst != null)
                     {
-                        estudianteUser = new Usuario { NombreUsuario = "estudiante1", ContrasenaHash = "123456", Cedula = "V-15000000", RolId = rolEst.IdRol, EstadoCuenta = true, UltimoAcceso = DateTime.Now };
+                        estudianteUser = new Usuario { NombreUsuario = "estudiante1", ContrasenaHash = "123456", Cedula = "V-15000000", RolId = rolEst.IdRol, EstadoCuenta = true, UltimoAcceso = DateTime.UtcNow };
                         _context.Usuarios.Add(estudianteUser);
                         await _context.SaveChangesAsync();
                         log.Add("Created user 'estudiante1'");
@@ -818,7 +818,7 @@ namespace UPTMDigital.API.Controllers
                     var rolSeg = await _context.Roles.FirstOrDefaultAsync(r => r.NombreRol == "Seguridad");
                     if (rolSeg != null)
                     {
-                        seg1User = new Usuario { NombreUsuario = "seguridad1", ContrasenaHash = "123456", Cedula = "V-40000001", RolId = rolSeg.IdRol, EstadoCuenta = true, UltimoAcceso = DateTime.Now };
+                        seg1User = new Usuario { NombreUsuario = "seguridad1", ContrasenaHash = "123456", Cedula = "V-40000001", RolId = rolSeg.IdRol, EstadoCuenta = true, UltimoAcceso = DateTime.UtcNow };
                         _context.Usuarios.Add(seg1User);
                         await _context.SaveChangesAsync();
                         log.Add("Created user 'seguridad1'");
@@ -834,9 +834,9 @@ namespace UPTMDigital.API.Controllers
                 if (!await _context.Anuncios.AnyAsync())
                 {
                     _context.Anuncios.AddRange(
-                        new Anuncio { Titulo = "Bienvenida al Periodo 2025-I", Contenido = "Iniciamos actividades académicas con entusiasmo.", FechaPublicacion = DateTime.Now.AddDays(-5), Autor = "Rectorado" },
-                        new Anuncio { Titulo = "Mantenimiento de Plataforma", Contenido = "El sistema estará en mantenimiento el domingo.", FechaPublicacion = DateTime.Now.AddDays(-2), Autor = "Soporte Técnico" },
-                        new Anuncio { Titulo = "Feria de Proyectos", Contenido = "Inscripciones abiertas para la feria anual.", FechaPublicacion = DateTime.Now, Autor = "Coordinación" }
+                        new Anuncio { Titulo = "Bienvenida al Periodo 2025-I", Contenido = "Iniciamos actividades académicas con entusiasmo.", FechaPublicacion = DateTime.UtcNow.AddDays(-5), Autor = "Rectorado" },
+                        new Anuncio { Titulo = "Mantenimiento de Plataforma", Contenido = "El sistema estará en mantenimiento el domingo.", FechaPublicacion = DateTime.UtcNow.AddDays(-2), Autor = "Soporte Técnico" },
+                        new Anuncio { Titulo = "Feria de Proyectos", Contenido = "Inscripciones abiertas para la feria anual.", FechaPublicacion = DateTime.UtcNow, Autor = "Coordinación" }
                     );
                     log.Add("Seeded 3 Anuncios.");
                 }
@@ -879,7 +879,7 @@ namespace UPTMDigital.API.Controllers
                     async Task EnsureInscripcion(int estId, int asigId)
                     {
                         if (!await _context.Inscripciones.AnyAsync(i => i.EstudianteId == estId && i.AsignaturaId == asigId))
-                            _context.Inscripciones.Add(new Inscripcion { EstudianteId = estId, AsignaturaId = asigId,  FechaInscripcion = DateTime.Now, Estado = "Inscrito" });
+                            _context.Inscripciones.Add(new Inscripcion { EstudianteId = estId, AsignaturaId = asigId,  FechaInscripcion = DateTime.UtcNow, Estado = "Inscrito" });
                     }
 
                     // E1: All Sem 1
@@ -898,9 +898,9 @@ namespace UPTMDigital.API.Controllers
                     if (!await _context.Notas.AnyAsync())
                     {
                         _context.Notas.AddRange(
-                           new Nota { EstudianteId = e1.IdEstudiante, AsignaturaId = asig1.IdAsignatura, Calificacion = 18, ProfesorId = p1.IdProfesor, CodigoQR = "QR-MAT-001", Fecha = DateTime.Now.AddDays(-10) },
-                           new Nota { EstudianteId = e1.IdEstudiante, AsignaturaId = asig2.IdAsignatura, Calificacion = 16, ProfesorId = p2.IdProfesor, CodigoQR = "QR-PROG-001", Fecha = DateTime.Now.AddDays(-5) },
-                           new Nota { EstudianteId = e2.IdEstudiante, AsignaturaId = asig3.IdAsignatura, Calificacion = 15, ProfesorId = p1.IdProfesor, CodigoQR = "QR-BD-001", Fecha = DateTime.Now.AddDays(-2) }
+                           new Nota { EstudianteId = e1.IdEstudiante, AsignaturaId = asig1.IdAsignatura, Calificacion = 18, ProfesorId = p1.IdProfesor, CodigoQR = "QR-MAT-001", Fecha = DateTime.UtcNow.AddDays(-10) },
+                           new Nota { EstudianteId = e1.IdEstudiante, AsignaturaId = asig2.IdAsignatura, Calificacion = 16, ProfesorId = p2.IdProfesor, CodigoQR = "QR-PROG-001", Fecha = DateTime.UtcNow.AddDays(-5) },
+                           new Nota { EstudianteId = e2.IdEstudiante, AsignaturaId = asig3.IdAsignatura, Calificacion = 15, ProfesorId = p1.IdProfesor, CodigoQR = "QR-BD-001", Fecha = DateTime.UtcNow.AddDays(-2) }
                        );
                         log.Add("Seeded initial Notas.");
                     }
@@ -909,9 +909,9 @@ namespace UPTMDigital.API.Controllers
                     if (!await _context.Mensajes.AnyAsync(m => m.AsignaturaId == asig2.IdAsignatura))
                     {
                         _context.Mensajes.AddRange(
-                           new Mensaje { AsignaturaId = asig2.IdAsignatura, Contenido = "Bienvenidos al curso de Programación I", FechaEnvio = DateTime.Now.AddDays(-10), EmisorNombre = p2.Nombres + " " + p2.Apellidos },
-                           new Mensaje { AsignaturaId = asig2.IdAsignatura, Contenido = "Recuerden instalar Visual Studio Code", FechaEnvio = DateTime.Now.AddDays(-8), EmisorNombre = p2.Nombres + " " + p2.Apellidos },
-                           new Mensaje { AsignaturaId = asig2.IdAsignatura, Contenido = "¿Cuándo es el primer examen?", FechaEnvio = DateTime.Now.AddDays(-7), EmisorNombre = e1.Nombres + " " + e1.Apellidos }
+                           new Mensaje { AsignaturaId = asig2.IdAsignatura, Contenido = "Bienvenidos al curso de Programación I", FechaEnvio = DateTime.UtcNow.AddDays(-10), EmisorNombre = p2.Nombres + " " + p2.Apellidos },
+                           new Mensaje { AsignaturaId = asig2.IdAsignatura, Contenido = "Recuerden instalar Visual Studio Code", FechaEnvio = DateTime.UtcNow.AddDays(-8), EmisorNombre = p2.Nombres + " " + p2.Apellidos },
+                           new Mensaje { AsignaturaId = asig2.IdAsignatura, Contenido = "¿Cuándo es el primer examen?", FechaEnvio = DateTime.UtcNow.AddDays(-7), EmisorNombre = e1.Nombres + " " + e1.Apellidos }
                         );
                         log.Add("Seeded messages for PROG101.");
                     }
@@ -935,9 +935,9 @@ namespace UPTMDigital.API.Controllers
                     if (!await _context.Asistencias.AnyAsync())
                     {
                         _context.Asistencias.AddRange(
-                            new Asistencia { EstudianteId = e1.IdEstudiante, AsignaturaId = asig1.IdAsignatura, Fecha = DateTime.Now.AddDays(-7), Estado = "Presente" },
-                            new Asistencia { EstudianteId = e1.IdEstudiante, AsignaturaId = asig1.IdAsignatura, Fecha = DateTime.Now.AddDays(-2), Estado = "Ausente" },
-                            new Asistencia { EstudianteId = e1.IdEstudiante, AsignaturaId = asig2.IdAsignatura, Fecha = DateTime.Now.AddDays(-5), Estado = "Presente" }
+                            new Asistencia { EstudianteId = e1.IdEstudiante, AsignaturaId = asig1.IdAsignatura, Fecha = DateTime.UtcNow.AddDays(-7), Estado = "Presente" },
+                            new Asistencia { EstudianteId = e1.IdEstudiante, AsignaturaId = asig1.IdAsignatura, Fecha = DateTime.UtcNow.AddDays(-2), Estado = "Ausente" },
+                            new Asistencia { EstudianteId = e1.IdEstudiante, AsignaturaId = asig2.IdAsignatura, Fecha = DateTime.UtcNow.AddDays(-5), Estado = "Presente" }
                         );
                         log.Add("Seeded Asistencias.");
                     }
@@ -946,7 +946,7 @@ namespace UPTMDigital.API.Controllers
                     if (!await _context.Constancias.AnyAsync())
                     {
                         _context.Constancias.Add(
-                            new Constancia { EstudianteId = e1.IdEstudiante, TipoConstancia = "Estudio", FechaSolicitud = DateTime.Now.AddMonths(-1), ArchivoUrl = "https://example.com/constancia1.pdf", Estado = "Emitida" }
+                            new Constancia { EstudianteId = e1.IdEstudiante, TipoConstancia = "Estudio", FechaSolicitud = DateTime.UtcNow.AddMonths(-1), ArchivoUrl = "https://example.com/constancia1.pdf", Estado = "Emitida" }
                         );
                         log.Add("Seeded Constancias.");
                     }
