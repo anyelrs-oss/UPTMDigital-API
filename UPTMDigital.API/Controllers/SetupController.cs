@@ -740,9 +740,9 @@ namespace UPTMDigital.API.Controllers
                 // 3. Seed New Roles for Test (Secretaria, Auditor, Seguridad, Coordinador)
                 var demoUsers = new[] {
                     new { Role = "Secretaria",  User = "tester_sec",   Pass = "123456", CI = "V-11111111" },
-                    new { Role = "Auditor",     User = "tester_aud",   Pass = "123456", CI = "V-22222222" },
+                    new { Role = "Auditor",     User = "tester_aud",   Pass = "123456", CI = "V-22222223" },
                     new { Role = "Seguridad",   User = "tester_seg",   Pass = "123456", CI = "V-33333333" },
-                    new { Role = "Coordinador", User = "tester_coord", Pass = "123456", CI = "V-44444444" }
+                    new { Role = "Coordinador", User = "tester_coord", Pass = "123456", CI = "V-66666666" }
                 };
 
                 foreach (var demo in demoUsers)
@@ -790,7 +790,7 @@ namespace UPTMDigital.API.Controllers
                     var rolEst = await _context.Roles.FirstOrDefaultAsync(r => r.NombreRol == "Estudiante");
                     if (rolEst != null)
                     {
-                        est2User = new Usuario { NombreUsuario = "estudiante2", ContrasenaHash = "123456", Cedula = "V-33333333", RolId = rolEst.IdRol };
+                        est2User = new Usuario { NombreUsuario = "estudiante2", ContrasenaHash = "123456", Cedula = "V-33333334", RolId = rolEst.IdRol };
                         _context.Usuarios.Add(est2User);
                         await _context.SaveChangesAsync();
                         log.Add("Created user 'estudiante2'");
@@ -798,7 +798,7 @@ namespace UPTMDigital.API.Controllers
                         // Create associated Student entity
                         var newEst = new Estudiante
                         {
-                            Cedula = "V-33333333",
+                            Cedula = "V-33333334",
                             Nombres = "Carlos Ruiz",
                             Apellidos = "Alumno",
                             CorreoInstitucional = "carlos@uptm.edu.ve",
@@ -971,6 +971,10 @@ namespace UPTMDigital.API.Controllers
                 }
 
                 await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException dbEx)
+            {
+                log.Add($"Data linking DB error: {dbEx.InnerException?.Message ?? dbEx.Message}");
             }
             catch (Exception ex)
             {
