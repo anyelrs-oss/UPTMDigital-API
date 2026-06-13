@@ -166,12 +166,12 @@ app.Use(async (context, next) =>
     {
         await next();
     }
-    catch (Exception ex) when (IsTransientDbException(ex))
+    catch (Exception ex)
     {
-        context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
         await context.Response.WriteAsJsonAsync(new
         {
-            message = "Servicio temporalmente no disponible por latencia de base de datos. Intente nuevamente en unos segundos.",
+            message = "Unhandled Exception Debug Info",
             error = ex.Message,
             stack = ex.ToString()
         });
