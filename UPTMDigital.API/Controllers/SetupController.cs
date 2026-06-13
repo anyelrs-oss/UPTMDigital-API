@@ -43,12 +43,12 @@ namespace UPTMDigital.API.Controllers
                     await EnsureRoleAsync("Coordinador");
                     await EnsureRoleAsync("Secretaria");
 
-                    await EnsureUserWithRoleAsync("tester_admin", "123456", "Administrador", log);
-                    await EnsureUserWithRoleAsync("tester_seg",   "123456", "Seguridad",     log);
-                    await EnsureUserWithRoleAsync("tester_prof",  "123456", "Profesor",      log);
-                    await EnsureUserWithRoleAsync("tester_est",   "123456", "Estudiante",    log);
-                    await EnsureUserWithRoleAsync("tester_coord", "123456", "Coordinador",   log);
-                    await EnsureUserWithRoleAsync("tester_sec",   "123456", "Secretaria",    log);
+                    await EnsureUserWithRoleAsync("tester_admin", "123456", "Administrador", "V-00000001", log);
+                    await EnsureUserWithRoleAsync("tester_seg",   "123456", "Seguridad",     "V-33333333", log);
+                    await EnsureUserWithRoleAsync("tester_prof",  "123456", "Profesor",      "V-44444444", log);
+                    await EnsureUserWithRoleAsync("tester_est",   "123456", "Estudiante",    "V-55555555", log);
+                    await EnsureUserWithRoleAsync("tester_coord", "123456", "Coordinador",   "V-66666666", log);
+                    await EnsureUserWithRoleAsync("tester_sec",   "123456", "Secretaria",    "V-11111111", log);
 
                     await EnsureProfesorProfileAsync("tester_prof", log);
                     await EnsureEstudianteProfileAsync("tester_est", log);
@@ -161,34 +161,53 @@ namespace UPTMDigital.API.Controllers
             }
         }
 
-        private async Task EnsureUserWithRoleAsync(string username, string password, string roleName, List<string> log)
+        private async Task EnsureUserWithRoleAsync(string username, string password, string roleName, string cedula, List<string> log)
         {
             var role = await _context.Roles.FirstAsync(r => r.NombreRol == roleName);
             var user = await _context.Usuarios.FirstOrDefaultAsync(u => u.NombreUsuario == username);
 
+            var reg = await _context.RegistrosInstitucionales.FirstOrDefaultAsync(r => r.Cedula == cedula);
+            if (reg == null)
+            {
+                reg = new RegistroInstitucional
+                {
+                    Cedula = cedula,
+                    Nombres = "Test " + roleName,
+                    Apellidos = "Usuario",
+                    CarreraDepartamento = roleName == "Profesor" || roleName == "Estudiante" || roleName == "Coordinador" ? "Informática" : "Administración",
+                    CorreoInstitucional = $"{username}@uptm.edu.ve",
+                    RolEsperado = roleName
+                };
+                _context.RegistrosInstitucionales.Add(reg);
+                await _context.SaveChangesAsync();
+                log.Add($"Created institutional record for '{username}' with CI '{cedula}'.");
+            }
+
             if (user == null)
             {
-                var dummyCI = "V-" + Math.Abs(username.GetHashCode()).ToString().PadLeft(8, '0').Substring(0, 8);
                 user = new Usuario
                 {
                     NombreUsuario = username,
                     ContrasenaHash = password,
-                    Cedula = dummyCI,
+                    Cedula = cedula,
                     RolId = role.IdRol,
                     EstadoCuenta = true,
-                    UltimoAcceso = DateTime.UtcNow
+                    UltimoAcceso = DateTime.UtcNow,
+                    RegistroInstitucionalId = reg.Id
                 };
                 _context.Usuarios.Add(user);
-                log.Add($"Created user '{username}' with role '{roleName}' and CI '{dummyCI}'.");
+                log.Add($"Created user '{username}' with role '{roleName}', CI '{cedula}' and linked institutional record.");
                 return;
             }
 
             user.ContrasenaHash = password;
             user.RolId = role.IdRol;
+            user.Cedula = cedula;
             user.EstadoCuenta = true;
             user.UltimoAcceso = DateTime.UtcNow;
+            user.RegistroInstitucionalId = reg.Id;
             _context.Entry(user).State = EntityState.Modified;
-            log.Add($"Updated user '{username}' with role '{roleName}'.");
+            log.Add($"Updated user '{username}' with role '{roleName}', CI '{cedula}' and linked institutional record.");
         }
 
         private async Task EnsureProfesorProfileAsync(string username, List<string> log)
@@ -544,6 +563,17 @@ namespace UPTMDigital.API.Controllers
         {
             var log = new List<string>();
 
+            // 0. Clean null/empty Cedulas in Usuario table to allow making Cedula non-nullable
+            try
+            {
+                await _context.Database.ExecuteSqlRawAsync(@"UPDATE ""Usuario"" SET ""Cedula"" = 'V-00000000' WHERE ""Cedula"" IS NULL OR ""Cedula"" = '';");
+                log.Add("Successfully cleaned null or empty Cedulas in Usuario table.");
+            }
+            catch (Exception ex)
+            {
+                log.Add($"Clean null/empty Cedulas warning: {ex.Message}");
+            }
+
             // 1. Update Schema and Apply Migrations
             try
             {
@@ -553,6 +583,37 @@ namespace UPTMDigital.API.Controllers
             catch (Exception ex)
             {
                 log.Add($"Schema update warning: {ex.Message}");
+            }
+
+            // 1.5 Bulk Link users to their institutional record by matching Cedula
+            try
+            {
+                var unlinkedUsers = await _context.Usuarios
+                    .Where(u => u.RegistroInstitucionalId == null)
+                    .ToListAsync();
+
+                int linkedCount = 0;
+                foreach (var user in unlinkedUsers)
+                {
+                    if (string.IsNullOrEmpty(user.Cedula)) continue;
+                    var reg = await _context.RegistrosInstitucionales
+                        .FirstOrDefaultAsync(r => r.Cedula == user.Cedula);
+                    if (reg != null)
+                    {
+                        user.RegistroInstitucionalId = reg.Id;
+                        _context.Entry(user).State = EntityState.Modified;
+                        linkedCount++;
+                    }
+                }
+                if (linkedCount > 0)
+                {
+                    await _context.SaveChangesAsync();
+                    log.Add($"Linked {linkedCount} existing users to their corresponding RegistroInstitucional.");
+                }
+            }
+            catch (Exception ex)
+            {
+                log.Add($"Bulk linking warning: {ex.Message}");
             }
 
             // 2. Link Data
