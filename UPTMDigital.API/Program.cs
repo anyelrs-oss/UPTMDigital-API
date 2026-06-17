@@ -22,6 +22,9 @@ var dbConnectionTimeoutSeconds = builder.Configuration.GetValue<int?>("DatabaseR
 var dbKeepAliveSeconds = builder.Configuration.GetValue<int?>("DatabaseResilience:KeepAliveSeconds") ?? 30;
 var dbMinPoolSize = builder.Configuration.GetValue<int?>("DatabaseResilience:MinPoolSize") ?? 0;
 var dbMaxPoolSize = builder.Configuration.GetValue<int?>("DatabaseResilience:MaxPoolSize") ?? 30;
+var dbPooling = builder.Configuration.GetValue<bool?>("DatabaseResilience:Pooling") ?? true;
+var dbConnectionIdleLifetimeSeconds = builder.Configuration.GetValue<int?>("DatabaseResilience:ConnectionIdleLifetimeSeconds") ?? 15;
+var dbConnectionLifetimeSeconds = builder.Configuration.GetValue<int?>("DatabaseResilience:ConnectionLifetimeSeconds") ?? 60;
 
 string BuildResilientConnectionString(string connectionString)
 {
@@ -35,10 +38,16 @@ string BuildResilientConnectionString(string connectionString)
         Timeout = dbConnectionTimeoutSeconds,
         CommandTimeout = dbCommandTimeoutSeconds,
         KeepAlive = dbKeepAliveSeconds,
-        Pooling = true,
-        MinPoolSize = dbMinPoolSize,
-        MaxPoolSize = dbMaxPoolSize,
+        Pooling = dbPooling,
     };
+
+    if (dbPooling)
+    {
+        csb.MinPoolSize = dbMinPoolSize;
+        csb.MaxPoolSize = dbMaxPoolSize;
+        csb.ConnectionIdleLifetime = dbConnectionIdleLifetimeSeconds;
+        csb.ConnectionLifetime = dbConnectionLifetimeSeconds;
+    }
 
     return csb.ConnectionString;
 }
