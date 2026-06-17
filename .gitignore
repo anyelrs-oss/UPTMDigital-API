@@ -26,3 +26,5 @@ Thumbs.db
 *.log
 UPTMDigital_Workspace/
 .idea/
+uptmdigital_app/android/app/src/assets/
+
