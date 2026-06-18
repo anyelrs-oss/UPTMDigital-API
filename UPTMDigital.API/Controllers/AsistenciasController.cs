@@ -20,12 +20,17 @@ namespace UPTMDigital.API.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Asistencia>>> GetAsistencias()
+        public async Task<ActionResult<IEnumerable<Asistencia>>> GetAsistencias([FromQuery] int? estudianteId)
         {
-            return await _context.Asistencias
+            var query = _context.Asistencias
                 .Include(a => a.Estudiante)
                 .Include(a => a.Asignatura)
-                .ToListAsync();
+                .AsQueryable();
+
+            if (estudianteId.HasValue)
+                query = query.Where(a => a.EstudianteId == estudianteId.Value);
+
+            return await query.ToListAsync();
         }
 
         [HttpGet("{id}")]

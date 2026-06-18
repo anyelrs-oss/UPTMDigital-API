@@ -10,8 +10,17 @@ class NotasScreen extends StatefulWidget {
   final int? professorId;
   final int? asignaturaId;
   final String? asignaturaNombre;
+  final int? estudianteId;
+  final String? estudianteNombre;
 
-  const NotasScreen({super.key, this.professorId, this.asignaturaId, this.asignaturaNombre});
+  const NotasScreen({
+    super.key, 
+    this.professorId, 
+    this.asignaturaId, 
+    this.asignaturaNombre,
+    this.estudianteId,
+    this.estudianteNombre,
+  });
 
   @override
   State<NotasScreen> createState() => _NotasScreenState();
@@ -31,12 +40,10 @@ class _NotasScreenState extends State<NotasScreen> {
   Future<void> _loadNotas() async {
     setState(() => _isLoading = true);
     
-    // Si no tenemos asignaturaId y somos profesor, deberíamos forzar la selección
-    // Por ahora, si asignaturaId es null, traerá todo (comportamiento actual)
-
     final data = await ApiService().getNotas(
       search: _searchQuery.isEmpty ? null : _searchQuery,
       asignaturaId: widget.asignaturaId,
+      estudianteId: widget.estudianteId,
     );
     if (mounted) {
       setState(() {
@@ -66,7 +73,9 @@ class _NotasScreenState extends State<NotasScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final String title = widget.asignaturaNombre ?? "Control de Calificaciones";
+    final String title = widget.estudianteNombre != null
+        ? "Notas de ${widget.estudianteNombre}"
+        : (widget.asignaturaNombre ?? "Control de Calificaciones");
 
     return Scaffold(
       appBar: AppBar(

@@ -60,8 +60,10 @@ class _AsistenciaManualScreenState extends State<AsistenciaManualScreen> {
   @override
   Widget build(BuildContext context) {
     final filtered = _estudiantes.where((e) {
-      final name = "${e['nombres']} ${e['apellidos']}".toLowerCase();
-      return name.contains(_searchQuery.toLowerCase()) || e['cedula'].contains(_searchQuery);
+      final estudiante = e['estudiante'];
+      if (estudiante == null) return false;
+      final name = "${estudiante['nombres']} ${estudiante['apellidos']}".toLowerCase();
+      return name.contains(_searchQuery.toLowerCase()) || estudiante['cedula'].toString().contains(_searchQuery);
     }).toList();
 
     return Scaffold(
@@ -87,13 +89,14 @@ class _AsistenciaManualScreenState extends State<AsistenciaManualScreen> {
                     itemCount: filtered.length,
                     itemBuilder: (ctx, i) {
                       final e = filtered[i];
+                      final estudiante = e['estudiante'] ?? {};
                       final id = e['estudianteId'];
                       final isSelected = _presentes.contains(id);
 
                       return Card(
                         child: CheckboxListTile(
-                          title: Text("${e['nombres']} ${e['apellidos']}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text("C.I: ${e['cedula']}"),
+                          title: Text("${estudiante['nombres'] ?? ''} ${estudiante['apellidos'] ?? ''}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Text("C.I: ${estudiante['cedula'] ?? ''}"),
                           value: isSelected,
                           onChanged: (val) {
                             setState(() {

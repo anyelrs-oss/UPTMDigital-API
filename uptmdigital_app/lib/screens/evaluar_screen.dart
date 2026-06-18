@@ -129,11 +129,12 @@ class _EvaluarScreenState extends State<EvaluarScreen> {
 
   Widget _buildEstudianteRow(dynamic e) {
     final id = e['estudianteId'];
+    final estudiante = e['estudiante'] ?? {};
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
-        title: Text("${e['nombres']} ${e['apellidos']}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-        subtitle: Text(e['cedula'], style: const TextStyle(fontSize: 12)),
+        title: Text("${estudiante['nombres'] ?? ''} ${estudiante['apellidos'] ?? ''}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+        subtitle: Text(estudiante['cedula'] ?? '', style: const TextStyle(fontSize: 12)),
         trailing: SizedBox(
           width: 70,
           child: TextField(

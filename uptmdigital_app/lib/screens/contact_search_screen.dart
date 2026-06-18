@@ -40,13 +40,14 @@ class _ContactSearchScreenState extends State<ContactSearchScreen> {
       for (var m in misMaterias) {
         final inscritos = await api.getInscripcionesByAsignatura(m['idAsignatura']);
         for (var i in inscritos) {
-          if (!studentIds.contains(i['estudianteId'])) {
+          final estudiante = i['estudiante'];
+          if (estudiante != null && !studentIds.contains(i['estudianteId'])) {
             studentIds.add(i['estudianteId']);
             myStudents.add({
-              'id': i['usuarioId'], // El ID de usuario para el chat privado
-              'nombre': "${i['nombres']} ${i['apellidos']}",
+              'id': estudiante['usuarioId'], // El ID de usuario para el chat privado
+              'nombre': "${estudiante['nombres']} ${estudiante['apellidos']}",
               'rol': 'Estudiante',
-              'cedula': i['cedula']
+              'cedula': estudiante['cedula']
             });
           }
         }

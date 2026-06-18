@@ -7,11 +7,13 @@ import 'package:file_picker/file_picker.dart';
 class PlanEvaluacionScreen extends StatefulWidget {
   final int asignaturaId;
   final String asignaturaNombre;
+  final bool isReadOnly;
 
   const PlanEvaluacionScreen({
     super.key,
     required this.asignaturaId,
     required this.asignaturaNombre,
+    this.isReadOnly = false,
   });
 
   @override
@@ -85,6 +87,8 @@ class _PlanEvaluacionScreenState extends State<PlanEvaluacionScreen> {
   }
 
   Future<void> _guardarPlan() async {
+    if (widget.isReadOnly) return;
+
     if (_totalPonderacion != 100) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("El total debe ser 100%. Actual: $_totalPonderacion%"), backgroundColor: Colors.red),
@@ -96,22 +100,32 @@ class _PlanEvaluacionScreenState extends State<PlanEvaluacionScreen> {
     final api = ApiService();
 
     try {
+      final List<Map<String, dynamic>> payload = [];
+
       if (_includeAttendance) {
-        await api.createEvaluacion({
+        payload.add({
           "asignaturaId": widget.asignaturaId,
           "nombre": "Asistencia",
           "ponderacion": _attendancePoints,
-          "fechaEvaluacion": DateTime.now().toIso8601String(),
+          "fechaEvaluacion": DateTime.now().toUtc().toIso8601String(),
+          "activo": true,
         });
       }
 
       for (var e in _evaluaciones) {
-        await api.createEvaluacion({
+        payload.add({
           "asignaturaId": widget.asignaturaId,
           "nombre": e['nombre'].text,
           "ponderacion": double.parse(e['ponderacion'].text),
-          "fechaEvaluacion": (e['fecha'] as DateTime).toIso8601String(),
+          "fechaEvaluacion": (e['fecha'] as DateTime).toUtc().toIso8601String(),
+          "activo": true,
         });
+      }
+
+      final ok = await api.savePlanEvaluacion(widget.asignaturaId, payload);
+
+      if (!ok) {
+        throw Exception("Error al guardar plan");
       }
 
       if (mounted) {
@@ -187,7 +201,7 @@ class _PlanEvaluacionScreenState extends State<PlanEvaluacionScreen> {
                 title: const Text("Incluir Asistencia como nota"),
                 subtitle: const Text("Se restará del total de evaluaciones"),
                 value: _includeAttendance,
-                onChanged: (val) => setState(() {
+                onChanged: widget.isReadOnly ? null : (val) => setState(() {
                   _includeAttendance = val!;
                   if (_includeAttendance && _attendancePoints == 0) _attendancePoints = 10;
                 }),
@@ -205,7 +219,7 @@ class _PlanEvaluacionScreenState extends State<PlanEvaluacionScreen> {
                         value: _attendancePoints,
                         min: 0, max: 30, divisions: 6,
                         label: "${_attendancePoints.toInt()}%",
-                        onChanged: (val) => setState(() => _attendancePoints = val),
+                        onChanged: widget.isReadOnly ? null : (val) => setState(() => _attendancePoints = val),
                       ),
                     ),
                     Text("${_attendancePoints.toInt()}%", style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -220,23 +234,25 @@ class _PlanEvaluacionScreenState extends State<PlanEvaluacionScreen> {
               itemBuilder: (ctx, i) => _buildEvalRow(i),
             ),
             const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                TextButton.icon(
-                  onPressed: () => setState(() => _addInitialRow()),
-                  icon: const Icon(Icons.add),
-                  label: const Text("Añadir Fila"),
-                ),
-                TextButton.icon(
-                  onPressed: _importFromPdf,
-                  icon: const Icon(Icons.picture_as_pdf),
-                  label: const Text("Importar PDF"),
-                  style: TextButton.styleFrom(foregroundColor: Colors.orange),
-                ),
-              ],
-            ),
-            const Divider(height: 40),
+            if (!widget.isReadOnly) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  TextButton.icon(
+                    onPressed: () => setState(() => _addInitialRow()),
+                    icon: const Icon(Icons.add),
+                    label: const Text("Añadir Fila"),
+                  ),
+                  TextButton.icon(
+                    onPressed: _importFromPdf,
+                    icon: const Icon(Icons.picture_as_pdf),
+                    label: const Text("Importar PDF"),
+                    style: TextButton.styleFrom(foregroundColor: Colors.orange),
+                  ),
+                ],
+              ),
+              const Divider(height: 40),
+            ],
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -258,16 +274,18 @@ class _PlanEvaluacionScreenState extends State<PlanEvaluacionScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 30),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _guardarPlan,
-                style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary, foregroundColor: Colors.white),
-                child: _isLoading ? const CircularProgressIndicator() : const Text("CARGAR PLAN COMPLETO"),
+            if (!widget.isReadOnly) ...[
+              const SizedBox(height: 30),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _guardarPlan,
+                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary, foregroundColor: Colors.white),
+                  child: _isLoading ? const CircularProgressIndicator() : const Text("CARGAR PLAN COMPLETO"),
+                ),
               ),
-            ),
+            ],
             const SizedBox(height: 50),
           ],
         ),
@@ -283,19 +301,38 @@ class _PlanEvaluacionScreenState extends State<PlanEvaluacionScreen> {
         children: [
           Row(
             children: [
-              Expanded(flex: 3, child: TextField(controller: e['nombre'], decoration: const InputDecoration(labelText: "Evaluación (Ej: Taller 1)"))),
+              Expanded(
+                flex: 3, 
+                child: TextField(
+                  controller: e['nombre'], 
+                  readOnly: widget.isReadOnly,
+                  decoration: const InputDecoration(labelText: "Evaluación (Ej: Taller 1)")
+                )
+              ),
               const SizedBox(width: 12),
-              Expanded(flex: 1, child: TextField(controller: e['ponderacion'], decoration: const InputDecoration(labelText: "%"), keyboardType: TextInputType.number)),
-              IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () => setState(() => _evaluaciones.removeAt(index))),
+              Expanded(
+                flex: 1, 
+                child: TextField(
+                  controller: e['ponderacion'], 
+                  readOnly: widget.isReadOnly,
+                  decoration: const InputDecoration(labelText: "%"), 
+                  keyboardType: TextInputType.number
+                )
+              ),
+              if (!widget.isReadOnly)
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, color: Colors.red), 
+                  onPressed: () => setState(() => _evaluaciones.removeAt(index))
+                ),
             ],
           ),
           const SizedBox(height: 8),
           InkWell(
-            onTap: () async {
+            onTap: widget.isReadOnly ? null : () async {
               final picked = await showDatePicker(
                 context: context,
                 initialDate: e['fecha'],
-                firstDate: DateTime.now(),
+                firstDate: DateTime.now().subtract(const Duration(days: 365)), // Permitir modificar fechas pasadas/presentes
                 lastDate: DateTime.now().add(const Duration(days: 365)),
               );
               if (picked != null) setState(() => e['fecha'] = picked);
@@ -306,7 +343,7 @@ class _PlanEvaluacionScreenState extends State<PlanEvaluacionScreen> {
                 children: [
                   const Icon(Icons.calendar_month_outlined, size: 18, color: Colors.grey),
                   const SizedBox(width: 8),
-                  Text("Fecha programada: ${(e['fecha'] as DateTime).day}/${(e['fecha'] as DateTime).month}"),
+                  Text("Fecha programada: ${(e['fecha'] as DateTime).day}/${(e['fecha'] as DateTime).month}/${(e['fecha'] as DateTime).year}"),
                 ],
               ),
             ),

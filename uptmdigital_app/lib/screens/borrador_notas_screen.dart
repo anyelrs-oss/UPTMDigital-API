@@ -80,10 +80,11 @@ class _BorradorNotasScreenState extends State<BorradorNotasScreen> {
                     separatorBuilder: (_, __) => const Divider(),
                     itemBuilder: (_, i) {
                       final e = _estudiantes[i];
+                      final estudiante = e['estudiante'] ?? {};
                       final id = e['estudianteId'];
                       return ListTile(
-                        title: Text("${e['nombres']} ${e['apellidos']}"),
-                        subtitle: Text(e['cedula']),
+                        title: Text("${estudiante['nombres'] ?? ''} ${estudiante['apellidos'] ?? ''}"),
+                        subtitle: Text(estudiante['cedula'] ?? ''),
                         trailing: SizedBox(
                           width: 60,
                           child: TextField(

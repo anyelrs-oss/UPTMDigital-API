@@ -228,6 +228,7 @@ class _HorariosScreenState extends State<HorariosScreen> {
                       Navigator.push(context, MaterialPageRoute(builder: (_) => PlanEvaluacionScreen(
                         asignaturaId: a.idAsignatura,
                         asignaturaNombre: a.nombre,
+                        isReadOnly: true,
                       )));
                     }),
                     _buildQuickAction(Icons.grade_outlined, "Notas", () {

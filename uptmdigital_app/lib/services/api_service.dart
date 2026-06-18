@@ -400,11 +400,12 @@ class ApiService {
 
   // --- NOTAS ---
 
-  Future<List<dynamic>> getNotas({String? search, int? asignaturaId}) async {
+  Future<List<dynamic>> getNotas({String? search, int? asignaturaId, int? estudianteId}) async {
     try {
       final params = <String, dynamic>{};
       if (search != null) params['search'] = search;
       if (asignaturaId != null) params['asignaturaId'] = asignaturaId.toString();
+      if (estudianteId != null) params['estudianteId'] = estudianteId.toString();
 
       final response = await _dio.get('/api/notas', queryParameters: params);
       return response.data as List;
@@ -461,9 +462,11 @@ class ApiService {
 
   // --- ASISTENCIAS ---
 
-  Future<List<dynamic>> getAsistencias() async {
+  Future<List<dynamic>> getAsistencias({int? estudianteId}) async {
     try {
-      final response = await _dio.get('/api/asistencias');
+      final params = <String, dynamic>{};
+      if (estudianteId != null) params['estudianteId'] = estudianteId.toString();
+      final response = await _dio.get('/api/asistencias', queryParameters: params);
       return response.data;
     } catch (e) {
       return [];
@@ -807,6 +810,16 @@ class ApiService {
       await _dio.post('/api/evaluaciones', data: data);
       return true;
     } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> savePlanEvaluacion(int asignaturaId, List<Map<String, dynamic>> evaluations) async {
+    try {
+      final response = await _dio.post('/api/evaluaciones/bulk/$asignaturaId', data: evaluations);
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint("Error saving bulk evaluation plan: $e");
       return false;
     }
   }

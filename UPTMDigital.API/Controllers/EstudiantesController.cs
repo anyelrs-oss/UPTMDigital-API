@@ -111,6 +111,7 @@ namespace UPTMDigital.API.Controllers
             var notas = await _context.Notas
                 .AsNoTracking()
                 .Include(n => n.Asignatura)
+                .Include(n => n.Profesor)
                 .Where(n => n.EstudianteId == estudiante.IdEstudiante)
                 .OrderByDescending(n => n.Fecha)
                 .Select(n => new
@@ -120,7 +121,9 @@ namespace UPTMDigital.API.Controllers
                     n.Fecha,
                     n.CodigoQR,
                     asignatura = n.Asignatura != null ? n.Asignatura.Nombre : "N/A",
-                    codigoAsignatura = n.Asignatura != null ? n.Asignatura.Codigo : "N/A"
+                    asignaturaNombre = n.Asignatura != null ? n.Asignatura.Nombre : "N/A",
+                    codigoAsignatura = n.Asignatura != null ? n.Asignatura.Codigo : "N/A",
+                    profesorNombre = n.Profesor != null ? n.Profesor.Nombres + " " + n.Profesor.Apellidos : "N/A"
                 })
                 .ToListAsync();
 

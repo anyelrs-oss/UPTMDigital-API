@@ -20,7 +20,7 @@ namespace UPTMDigital.API.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetNotas([FromQuery] string? search, [FromQuery] int? asignaturaId)
+        public async Task<IActionResult> GetNotas([FromQuery] string? search, [FromQuery] int? asignaturaId, [FromQuery] int? estudianteId)
         {
             var query = _context.Notas
                 .Include(n => n.Estudiante)
@@ -29,6 +29,9 @@ namespace UPTMDigital.API.Controllers
 
             if (asignaturaId.HasValue)
                 query = query.Where(n => n.AsignaturaId == asignaturaId.Value);
+
+            if (estudianteId.HasValue)
+                query = query.Where(n => n.EstudianteId == estudianteId.Value);
 
             if (!string.IsNullOrEmpty(search))
             {

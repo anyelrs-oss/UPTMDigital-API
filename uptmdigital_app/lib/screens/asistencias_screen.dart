@@ -8,7 +8,16 @@ class AsistenciasScreen extends StatefulWidget {
   final int? professorId;
   final int? asignaturaId;
   final String? asignaturaNombre;
-  const AsistenciasScreen({super.key, this.professorId, this.asignaturaId, this.asignaturaNombre});
+  final int? estudianteId;
+  final String? estudianteNombre;
+  const AsistenciasScreen({
+    super.key, 
+    this.professorId, 
+    this.asignaturaId, 
+    this.asignaturaNombre,
+    this.estudianteId,
+    this.estudianteNombre,
+  });
 
   @override
   State<AsistenciasScreen> createState() => _AsistenciasScreenState();
@@ -29,8 +38,8 @@ class _AsistenciasScreenState extends State<AsistenciasScreen> {
     setState(() => _isLoading = true);
     
     final api = ApiService();
-    // Obtener todas las asistencias (o filtradas por profesor si el endpoint lo soporta)
-    final data = await api.getAsistencias();
+    // Obtener todas las asistencias (o filtradas por estudiante si se provee)
+    final data = await api.getAsistencias(estudianteId: widget.estudianteId);
     
     if (mounted) {
       setState(() {
@@ -77,7 +86,9 @@ class _AsistenciasScreenState extends State<AsistenciasScreen> {
   @override
   Widget build(BuildContext context) {
     final isAdmin = widget.professorId == null && widget.asignaturaId == null;
-    final String title = widget.asignaturaNombre ?? "Control de Asistencia";
+    final String title = widget.estudianteNombre != null
+        ? "Asistencia de ${widget.estudianteNombre}"
+        : (widget.asignaturaNombre ?? "Control de Asistencia");
 
     return Scaffold(
       appBar: AppBar(

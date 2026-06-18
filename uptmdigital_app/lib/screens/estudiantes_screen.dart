@@ -5,6 +5,8 @@ import 'package:uptmdigital_app/theme.dart';
 import 'package:uptmdigital_app/screens/student_form_screen.dart';
 import 'package:uptmdigital_app/widgets/search_filter_bar.dart';
 import 'package:uptmdigital_app/services/supabase_service.dart';
+import 'package:uptmdigital_app/screens/notas_screen.dart';
+import 'package:uptmdigital_app/screens/asistencias_screen.dart';
 import 'dart:convert';
 
 class EstudiantesScreen extends StatefulWidget {
@@ -282,7 +284,41 @@ class _EstudiantesScreenState extends State<EstudiantesScreen> {
             _detailRow(Icons.badge, "Cédula", e.cedula),
             _detailRow(Icons.email, "Correo", e.correoInstitucional),
             _detailRow(Icons.phone, "Teléfono", e.telefono ?? "No registrado"),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => NotasScreen(
+                        estudianteId: e.idEstudiante,
+                        estudianteNombre: "${e.nombres} ${e.apellidos}",
+                      )));
+                    },
+                    icon: const Icon(Icons.grade),
+                    label: const Text("VER NOTAS", style: TextStyle(fontSize: 11)),
+                    style: ElevatedButton.styleFrom(backgroundColor: AppTheme.secondary, foregroundColor: Colors.white),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => AsistenciasScreen(
+                        estudianteId: e.idEstudiante,
+                        estudianteNombre: "${e.nombres} ${e.apellidos}",
+                      )));
+                    },
+                    icon: const Icon(Icons.calendar_month),
+                    label: const Text("VER ASISTENCIA", style: TextStyle(fontSize: 11)),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
