@@ -23,7 +23,17 @@ class _GenerateQRScreenState extends State<GenerateQRScreen> {
   @override
   void initState() {
     super.initState();
+    _checkExistingValidation();
     _loadAsignaturas();
+  }
+
+  Future<void> _checkExistingValidation() async {
+    final lastValidation = await ApiService().storage.read(key: 'last_pin_validation_date');
+    final today = DateTime.now().toIso8601String().split('T')[0];
+    
+    if (lastValidation == today) {
+      if (mounted) setState(() => _pinValidated = true);
+    }
   }
 
   Future<void> _loadAsignaturas() async {
@@ -43,6 +53,10 @@ class _GenerateQRScreenState extends State<GenerateQRScreen> {
 
     final success = await ApiService().validarPinDocente(_pinController.text);
     if (success) {
+      // Guardar validación para hoy
+      final today = DateTime.now().toIso8601String().split('T')[0];
+      await ApiService().storage.write(key: 'last_pin_validation_date', value: today);
+
       setState(() => _pinValidated = true);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(

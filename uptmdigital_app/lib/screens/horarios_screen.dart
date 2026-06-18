@@ -130,40 +130,85 @@ class _HorariosScreenState extends State<HorariosScreen> {
             initiallyExpanded: true,
             title: Text(a.nombre, style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary)),
             subtitle: Text("${a.codigo} • Semestre ${a.semestreNombre}", style: const TextStyle(fontSize: 12)),
-            children: list.map((h) => Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.grey[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey[200]!),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.access_time_filled, size: 24, color: Colors.orange),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (list.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Text("No hay horarios asignados", style: TextStyle(color: Colors.grey, fontSize: 13)),
+                ),
+              ...list.map((h) => Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    )
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.access_time_filled, size: 24, color: Colors.orange),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "${h['dia']}",
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            "${h['horaInicio']} - ${h['horaFin']}",
+                            style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Text("${h['dia']}", style: const TextStyle(fontWeight: FontWeight.bold)),
-                        Text("${h['horaInicio']} - ${h['horaFin']}", style: TextStyle(color: Colors.grey[700])),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            "Aula: ${h['aula']}",
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.primary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        if (widget.isAdmin)
+                          TextButton.icon(
+                            onPressed: () => _showEditAulaDialog(h),
+                            icon: const Icon(Icons.edit, size: 14),
+                            label: const Text("Editar", style: TextStyle(fontSize: 12)),
+                            style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 30)),
+                          ),
                       ],
                     ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
-                    child: Text("Aula: ${h['aula']}", style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary, fontSize: 12)),
-                  ),
-                  if (widget.isAdmin)
-                    IconButton(
-                      icon: const Icon(Icons.edit_outlined, color: Colors.blue, size: 20),
-                      onPressed: () => _showEditAulaDialog(h),
-                    ),
-                ],
-              ),
-            )).toList(),
+                  ],
+                ),
+              )).toList(),
+            ],
           ),
           if (widget.studentId != null || widget.professorId != null)
             Padding(

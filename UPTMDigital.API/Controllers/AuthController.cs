@@ -126,7 +126,7 @@ namespace UPTMDigital.API.Controllers
                 issuer: _config["Jwt:Issuer"],
                 audience: _config["Jwt:Audience"],
                 claims: claims,
-                expires: DateTime.Now.AddDays(30),
+                expires: DateTime.UtcNow.AddDays(30),
                 signingCredentials: creds);
 
             return new JwtSecurityTokenHandler().WriteToken(token);
@@ -201,7 +201,7 @@ namespace UPTMDigital.API.Controllers
                 Cedula = register.Cedula,
                 RolId = roleNode.IdRol,
                 EstadoCuenta = true,
-                UltimoAcceso = DateTime.Now
+                UltimoAcceso = DateTime.UtcNow
             };
 
             _context.Usuarios.Add(newUser);
@@ -217,7 +217,7 @@ namespace UPTMDigital.API.Controllers
                     Apellidos = institutionalRecord.Apellidos,
                     CorreoInstitucional = institutionalRecord.CorreoInstitucional,
                     UsuarioId = newUser.IdUsuario,
-                    FechaRegistro = DateTime.Now
+                    FechaRegistro = DateTime.UtcNow
                 });
             }
             else if (roleName == "Profesor")

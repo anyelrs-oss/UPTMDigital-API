@@ -82,11 +82,11 @@ namespace UPTMDigital.API.Controllers
                 if (inscripcion == null) return BadRequest("Estudiante no inscrito en esta asignatura.");
 
                 // 2. Check if attendance already exists for today
-                var today = DateTime.Today;
+                var today = DateTime.SpecifyKind(DateTime.UtcNow.Date, DateTimeKind.Utc);
                 var existe = await _context.Asistencias
                     .AnyAsync(a => a.EstudianteId == estudianteId && a.AsignaturaId == asignaturaId && a.Fecha == today);
 
-                if (existe) return Ok(new { message = "Asistencia ya registrada previamente." });
+                if (existe) return Conflict(new { message = "Asistencia ya registrada previamente." });
 
                 // 3. Register Attendance
                 var asistencia = new Asistencia

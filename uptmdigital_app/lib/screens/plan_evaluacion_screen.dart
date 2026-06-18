@@ -27,7 +27,45 @@ class _PlanEvaluacionScreenState extends State<PlanEvaluacionScreen> {
   @override
   void initState() {
     super.initState();
-    _addInitialRow();
+    _loadExistingPlan();
+  }
+
+  Future<void> _loadExistingPlan() async {
+    setState(() => _isLoading = true);
+    try {
+      final api = ApiService();
+      final evaluaciones = await api.getEvaluaciones(widget.asignaturaId);
+      
+      if (mounted) {
+        if (evaluaciones.isNotEmpty) {
+          _evaluaciones.clear();
+          for (var item in evaluaciones) {
+            if (item['nombre'].toString().toLowerCase() == 'asistencia') {
+              setState(() {
+                _includeAttendance = true;
+                _attendancePoints = (item['ponderacion'] as num).toDouble();
+              });
+              continue;
+            }
+            
+            _evaluaciones.add({
+              "idEvaluacion": item['idEvaluacion'],
+              "nombre": TextEditingController(text: item['nombre']),
+              "ponderacion": TextEditingController(text: item['ponderacion'].toString()),
+              "fecha": DateTime.tryParse(item['fechaEvaluacion'] ?? '') ?? DateTime.now(),
+            });
+          }
+          if (_evaluaciones.isEmpty && !_includeAttendance) _addInitialRow();
+        } else {
+          _addInitialRow();
+        }
+      }
+    } catch (e) {
+      debugPrint("Error loading existing plan: $e");
+      if (mounted) _addInitialRow();
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   void _addInitialRow() {

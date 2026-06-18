@@ -105,7 +105,7 @@ namespace UPTMDigital.API.Controllers
                 if (notaExistente != null)
                 {
                     notaExistente.Calificacion = item.Calificacion;
-                    notaExistente.Fecha = DateTime.Now;
+                    notaExistente.Fecha = DateTime.UtcNow;
                     notaExistente.ProfesorId = profesorId;
                 }
                 else
@@ -116,7 +116,7 @@ namespace UPTMDigital.API.Controllers
                         EstudianteId = item.EstudianteId,
                         EvaluacionId = dto.EvaluacionId,
                         Calificacion = item.Calificacion,
-                        Fecha = DateTime.Now,
+                        Fecha = DateTime.UtcNow,
                         ProfesorId = profesorId
                     };
                     _context.Notas.Add(nuevaNota);

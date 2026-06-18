@@ -43,12 +43,17 @@ class _QRScanScreenState extends State<QRScanScreen> {
           );
           Navigator.pop(context); // Close scanner on success
         } else {
+           // Si falla, es probable que ya esté registrado (el backend suele devolver error si ya existe el registro)
            ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("❌ Error al registrar asistencia o ya registrada"), backgroundColor: Colors.red),
+            const SnackBar(
+              content: Text("Usted ya registró asistencia para esta materia hoy o el código es inválido."), 
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 3),
+            ),
           );
            // Delay to allow reading message before scanning again
-           await Future.delayed(const Duration(seconds: 2));
-           setState(() => _isProcessing = false);
+           await Future.delayed(const Duration(seconds: 3));
+           if (mounted) setState(() => _isProcessing = false);
         }
       } else {
         throw Exception("Código QR inválido (sin asignaturaId)");

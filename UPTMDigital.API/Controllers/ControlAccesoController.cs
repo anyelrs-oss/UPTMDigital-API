@@ -62,7 +62,7 @@ namespace UPTMDigital.API.Controllers
                 Cedula = dto.Cedula,
                 Tipo = dto.Tipo,
                 Ubicacion = dto.Ubicacion,
-                FechaHora = DateTime.Now,
+                FechaHora = DateTime.UtcNow,
             };
 
             _context.ControlAccesos.Add(registro);
@@ -99,7 +99,7 @@ namespace UPTMDigital.API.Controllers
                 Cedula = dto.Cedula,
                 Tipo = "Apertura",
                 Ubicacion = dto.Ubicacion, // The specific room
-                FechaHora = DateTime.Now
+                FechaHora = DateTime.UtcNow
             };
 
             _context.ControlAccesos.Add(registro);

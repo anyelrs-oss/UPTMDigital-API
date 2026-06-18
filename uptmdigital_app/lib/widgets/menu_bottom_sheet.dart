@@ -259,11 +259,13 @@ class MenuBottomSheet extends StatelessWidget {
                    notImpl();
                  }
               }},
+              {'icon': Icons.lock_open, 'label': 'Apertura de Aula', 'onTap': () => nav(const ClassroomOpeningScreen())},
             ]
           },
           {
              'title': 'COMUNICACIÓN',
              'items': [
+               {'icon': Icons.chat_bubble_outline, 'label': 'Chats', 'onTap': () => nav(const InboxScreen())},
                {'icon': Icons.campaign, 'label': 'Anuncios', 'onTap': () => nav(const NoticiasListScreen())},
              ]
           },
