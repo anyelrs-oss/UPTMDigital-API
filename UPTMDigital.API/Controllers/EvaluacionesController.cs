@@ -43,40 +43,52 @@ namespace UPTMDigital.API.Controllers
         [HttpPost("bulk/{asignaturaId}")]
         public async Task<IActionResult> PostPlan(int asignaturaId, [FromBody] List<EvaluacionConfig> newConfigs)
         {
-            using var transaction = await _context.Database.BeginTransactionAsync();
+            var executionStrategy = _context.Database.CreateExecutionStrategy();
+
             try
             {
-                // 1. Desactivar las evaluaciones anteriores de esa materia
-                var oldConfigs = await _context.EvaluacionesConfig
-                    .Where(e => e.AsignaturaId == asignaturaId && e.Activo)
-                    .ToListAsync();
-
-                foreach (var old in oldConfigs)
+                await executionStrategy.ExecuteAsync(async () =>
                 {
-                    old.Activo = false;
-                }
-
-                // 2. Agregar las nuevas evaluaciones
-                foreach (var config in newConfigs)
-                {
-                    config.AsignaturaId = asignaturaId;
-                    if (config.FechaEvaluacion.Kind != DateTimeKind.Utc)
+                    using var transaction = await _context.Database.BeginTransactionAsync();
+                    try
                     {
-                        config.FechaEvaluacion = DateTime.SpecifyKind(config.FechaEvaluacion, DateTimeKind.Utc);
-                    }
-                    config.Activo = true;
-                    config.IdEvaluacion = 0; // Forzar inserción
-                    _context.EvaluacionesConfig.Add(config);
-                }
+                        // 1. Desactivar las evaluaciones anteriores de esa materia
+                        var oldConfigs = await _context.EvaluacionesConfig
+                            .Where(e => e.AsignaturaId == asignaturaId && e.Activo)
+                            .ToListAsync();
 
-                await _context.SaveChangesAsync();
-                await transaction.CommitAsync();
+                        foreach (var old in oldConfigs)
+                        {
+                            old.Activo = false;
+                        }
+
+                        // 2. Agregar las nuevas evaluaciones
+                        foreach (var config in newConfigs)
+                        {
+                            config.AsignaturaId = asignaturaId;
+                            if (config.FechaEvaluacion.Kind != DateTimeKind.Utc)
+                            {
+                                config.FechaEvaluacion = DateTime.SpecifyKind(config.FechaEvaluacion, DateTimeKind.Utc);
+                            }
+                            config.Activo = true;
+                            config.IdEvaluacion = 0; // Forzar inserción
+                            _context.EvaluacionesConfig.Add(config);
+                        }
+
+                        await _context.SaveChangesAsync();
+                        await transaction.CommitAsync();
+                    }
+                    catch
+                    {
+                        await transaction.RollbackAsync();
+                        throw;
+                    }
+                });
 
                 return Ok(new { message = $"Plan de evaluación guardado. Se agregaron {newConfigs.Count} evaluaciones." });
             }
             catch (Exception ex)
             {
-                await transaction.RollbackAsync();
                 return StatusCode(500, $"Error al guardar el plan de evaluación: {ex.Message}");
             }
         }
