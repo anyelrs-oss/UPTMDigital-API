@@ -17,6 +17,10 @@ import 'package:uptmdigital_app/screens/reporte_asistencia_docente_screen.dart';
 import 'package:uptmdigital_app/screens/anuncios_admin_screen.dart';
 import 'package:uptmdigital_app/screens/auditoria_main_screen.dart';
 
+import 'package:uptmdigital_app/screens/evaluar_screen.dart';
+import 'package:uptmdigital_app/screens/plan_evaluacion_screen.dart';
+import 'package:uptmdigital_app/screens/academic_hierarchy_screen.dart';
+
 class MenuBottomSheet extends StatelessWidget {
   final String role; // 'admin', 'student', 'professor', 'security'
   final Map<String, dynamic>? userData; // Passed from dashboard to allow navigation with data
@@ -220,7 +224,14 @@ class MenuBottomSheet extends StatelessWidget {
               }},
               {'icon': Icons.assignment_turned_in, 'label': 'Evaluar', 'onTap': () {
                  if (hasData) {
-                   nav(NotasScreen(professorId: userData!['idProfesor']));
+                   nav(AcademicHierarchyScreen(target: AcademicTarget.evaluar, professorId: userData!['idProfesor']));
+                 } else {
+                   notImpl();
+                 }
+              }},
+              {'icon': Icons.assignment_outlined, 'label': 'Planificación', 'onTap': () {
+                 if (hasData) {
+                   nav(AcademicHierarchyScreen(target: AcademicTarget.planificacion, professorId: userData!['idProfesor']));
                  } else {
                    notImpl();
                  }
@@ -244,8 +255,7 @@ class MenuBottomSheet extends StatelessWidget {
           {
              'title': 'COMUNICACIÓN',
              'items': [
-               {'icon': Icons.chat, 'label': 'Chats', 'onTap': notImpl},
-               {'icon': Icons.campaign, 'label': 'Anuncios', 'onTap': notImpl},
+               {'icon': Icons.campaign, 'label': 'Anuncios', 'onTap': () => nav(const NoticiasListScreen())},
              ]
           },
           {

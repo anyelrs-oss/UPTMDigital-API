@@ -4,6 +4,8 @@ import 'package:uptmdigital_app/theme.dart';
 import 'package:uptmdigital_app/screens/chat_screen.dart';
 import 'package:intl/intl.dart';
 
+import 'package:uptmdigital_app/screens/contact_search_screen.dart';
+
 class InboxScreen extends StatefulWidget {
   const InboxScreen({super.key});
 
@@ -23,13 +25,20 @@ class _InboxScreenState extends State<InboxScreen> {
 
   Future<void> _loadChats() async {
     final data = await ApiService().getMisChats();
+    final storage = ApiService().storage;
+    final profIdStr = await storage.read(key: 'profesor_id');
+    final profId = int.tryParse(profIdStr ?? '');
+    
     if (mounted) {
       setState(() {
         _chats = data;
         _isLoading = false;
+        _myProfessorId = profId;
       });
     }
   }
+
+  int? _myProfessorId;
 
   @override
   Widget build(BuildContext context) {
@@ -50,8 +59,9 @@ class _InboxScreenState extends State<InboxScreen> {
               ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          // TODO: Implement new 1:1 chat selection
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Búsqueda de contactos en desarrollo...")));
+          Navigator.push(context, MaterialPageRoute(
+            builder: (_) => ContactSearchScreen(professorId: _myProfessorId)
+          ));
         },
         child: const Icon(Icons.chat_bubble_outline),
       ),

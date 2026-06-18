@@ -7,16 +7,21 @@ import 'package:uptmdigital_app/screens/horarios_screen.dart';
 import 'package:uptmdigital_app/screens/notas_screen.dart';
 import 'package:uptmdigital_app/screens/asistencias_screen.dart';
 
+import 'package:uptmdigital_app/screens/evaluar_screen.dart';
+import 'package:uptmdigital_app/screens/plan_evaluacion_screen.dart';
+
 class SubjectSelectionScreen extends StatefulWidget {
   final dynamic carrera;
   final dynamic semestre;
   final AcademicTarget target;
+  final int? professorId;
 
   const SubjectSelectionScreen({
     super.key,
     required this.carrera,
     required this.semestre,
     required this.target,
+    this.professorId,
   });
 
   @override
@@ -46,6 +51,12 @@ class _SubjectSelectionScreenState extends State<SubjectSelectionScreen> {
           a['carreraId'] == widget.carrera['idCarrera'] &&
           a['semestreId'] == widget.semestre['idSemestre']
         ).toList();
+
+        // Si hay professorId, filtramos solo las suyas
+        if (widget.professorId != null) {
+          _asignaturas = _asignaturas.where((a) => a['profesorId'] == widget.professorId).toList();
+        }
+
         _isLoading = false;
       });
     }
@@ -120,6 +131,16 @@ class _SubjectSelectionScreenState extends State<SubjectSelectionScreen> {
       case AcademicTarget.asistencias:
         Navigator.push(context, MaterialPageRoute(
           builder: (_) => AsistenciasScreen(asignaturaId: id, asignaturaNombre: nombre)
+        ));
+        break;
+      case AcademicTarget.evaluar:
+        Navigator.push(context, MaterialPageRoute(
+          builder: (_) => EvaluarScreen(asignaturaId: id, asignaturaNombre: nombre)
+        ));
+        break;
+      case AcademicTarget.planificacion:
+        Navigator.push(context, MaterialPageRoute(
+          builder: (_) => PlanEvaluacionScreen(asignaturaId: id, asignaturaNombre: nombre)
         ));
         break;
     }

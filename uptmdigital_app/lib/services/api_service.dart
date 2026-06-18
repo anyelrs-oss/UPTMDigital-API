@@ -579,6 +579,14 @@ class ApiService {
 
         if (data['perfil'] != null) {
           userData.addAll(Map<String, dynamic>.from(data['perfil']));
+          
+          // Guardar IDs específicos para facilitar el acceso en otras pantallas
+          if (userData.containsKey('idEstudiante')) {
+            await storage.write(key: 'estudiante_id', value: userData['idEstudiante'].toString());
+          }
+          if (userData.containsKey('idProfesor')) {
+            await storage.write(key: 'profesor_id', value: userData['idProfesor'].toString());
+          }
         }
 
         await storage.write(key: 'cached_user_me', value: jsonEncode(userData));

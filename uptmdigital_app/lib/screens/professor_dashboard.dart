@@ -148,16 +148,13 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
         activePage = _buildHomeTab();
         break;
       case 1:
-        activePage = const HorariosScreen(isAdmin: false);
+        activePage = HorariosScreen(isAdmin: false, professorId: _professorData!['idProfesor']);
         break;
       case 2:
-        activePage = const InboxScreen(); // Real Inbox
+        activePage = AsistenciasScreen(professorId: _professorData!['idProfesor']);
         break;
       case 3:
-        activePage = const NotasScreen();
-        break;
-      case 4:
-        activePage = const AsistenciasScreen();
+        activePage = NotasScreen(professorId: _professorData!['idProfesor']);
         break;
       default:
         activePage = _buildHomeTab();
@@ -204,7 +201,7 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
             _buildNavItem(Icons.home_outlined, "Inicio", 0),
             _buildNavItem(Icons.calendar_today_outlined, "Horario", 1),
             const SizedBox(width: 40), // FAB Space
-            _buildNavItem(Icons.chat_bubble_outline, "Chats", 2),
+            _buildNavItem(Icons.assignment_outlined, "Asistencia", 2),
             _buildNavItem(Icons.grade_outlined, "Notas", 3),
           ],
         ),

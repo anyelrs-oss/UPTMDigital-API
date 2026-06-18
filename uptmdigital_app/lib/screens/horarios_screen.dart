@@ -6,6 +6,9 @@ import 'package:uptmdigital_app/screens/chat_screen.dart';
 import 'package:uptmdigital_app/screens/plan_evaluacion_screen.dart';
 import 'package:uptmdigital_app/screens/my_grades_screen.dart';
 
+import 'package:uptmdigital_app/screens/asistencias_screen.dart';
+import 'package:uptmdigital_app/screens/evaluar_screen.dart';
+
 class HorariosScreen extends StatefulWidget {
   final bool isAdmin;
   final int? studentId;
@@ -134,29 +137,51 @@ class _HorariosScreenState extends State<HorariosScreen> {
                   : null,
             )).toList(),
           ),
-          if (widget.studentId != null)
+          if (widget.studentId != null || widget.professorId != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _buildQuickAction(Icons.chat_bubble_outline, "Chat", () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(
-                      asignaturaId: a.idAsignatura,
-                      title: a.nombre,
-                      userName: "Estudiante", // Se puede obtener del storage
-                    )));
-                  }),
-                  _buildQuickAction(Icons.assignment_outlined, "Plan", () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => PlanEvaluacionScreen(
-                      asignaturaId: a.idAsignatura,
-                      asignaturaNombre: a.nombre,
-                    )));
-                  }),
-                  _buildQuickAction(Icons.grade_outlined, "Notas", () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const MyGradesScreen()));
-                  }),
-                ],
+                children: widget.studentId != null 
+                  ? [
+                    _buildQuickAction(Icons.chat_bubble_outline, "Chat", () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(
+                        asignaturaId: a.idAsignatura,
+                        title: a.nombre,
+                        userName: "Estudiante",
+                      )));
+                    }),
+                    _buildQuickAction(Icons.assignment_outlined, "Plan", () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => PlanEvaluacionScreen(
+                        asignaturaId: a.idAsignatura,
+                        asignaturaNombre: a.nombre,
+                      )));
+                    }),
+                    _buildQuickAction(Icons.grade_outlined, "Notas", () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const MyGradesScreen()));
+                    }),
+                  ]
+                  : [
+                    _buildQuickAction(Icons.chat_bubble_outline, "Chat", () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(
+                        asignaturaId: a.idAsignatura,
+                        title: a.nombre,
+                        userName: "Profesor",
+                      )));
+                    }),
+                    _buildQuickAction(Icons.assignment_outlined, "Planificación", () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => PlanEvaluacionScreen(
+                        asignaturaId: a.idAsignatura,
+                        asignaturaNombre: a.nombre,
+                      )));
+                    }),
+                    _buildQuickAction(Icons.list_alt, "Asistencia", () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => AsistenciasScreen(
+                        asignaturaId: a.idAsignatura,
+                        asignaturaNombre: a.nombre,
+                      )));
+                    }),
+                  ],
               ),
             ),
           const SizedBox(height: 8),

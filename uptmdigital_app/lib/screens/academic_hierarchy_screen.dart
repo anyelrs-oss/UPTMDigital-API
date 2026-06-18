@@ -4,11 +4,12 @@ import 'package:uptmdigital_app/services/api_service.dart';
 import 'package:uptmdigital_app/theme.dart';
 import 'package:uptmdigital_app/widgets/institutional_card.dart';
 
-enum AcademicTarget { notas, horarios, asistencias }
+enum AcademicTarget { notas, horarios, asistencias, evaluar, planificacion }
 
 class AcademicHierarchyScreen extends StatefulWidget {
   final AcademicTarget target;
-  const AcademicHierarchyScreen({super.key, required this.target});
+  final int? professorId;
+  const AcademicHierarchyScreen({super.key, required this.target, this.professorId});
 
   @override
   State<AcademicHierarchyScreen> createState() => _AcademicHierarchyScreenState();
@@ -43,6 +44,8 @@ class _AcademicHierarchyScreenState extends State<AcademicHierarchyScreen> {
     if (widget.target == AcademicTarget.notas) title = "Selección de Carrera (Notas)";
     if (widget.target == AcademicTarget.horarios) title = "Selección de Carrera (Horarios)";
     if (widget.target == AcademicTarget.asistencias) title = "Selección de Carrera (Asistencias)";
+    if (widget.target == AcademicTarget.evaluar) title = "Selección de Carrera (Evaluar)";
+    if (widget.target == AcademicTarget.planificacion) title = "Selección de Carrera (Planificación)";
 
     return Scaffold(
       appBar: AppBar(title: Text(title)),
@@ -77,6 +80,7 @@ class _AcademicHierarchyScreenState extends State<AcademicHierarchyScreen> {
           carrera: carrera,
           semestres: _semestres,
           target: widget.target,
+          professorId: widget.professorId,
         ),
       ),
     );
@@ -87,12 +91,14 @@ class QuarterSelectionScreen extends StatelessWidget {
   final dynamic carrera;
   final List<dynamic> semestres;
   final AcademicTarget target;
+  final int? professorId;
 
   const QuarterSelectionScreen({
     super.key,
     required this.carrera,
     required this.semestres,
     required this.target,
+    this.professorId,
   });
 
   @override
@@ -128,6 +134,7 @@ class QuarterSelectionScreen extends StatelessWidget {
           carrera: carrera,
           semestre: semestre,
           target: target,
+          professorId: professorId,
         ),
       ),
     );
