@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:uptmdigital_app/theme.dart';
 import 'package:uptmdigital_app/services/api_service.dart';
+import 'package:uptmdigital_app/services/supabase_service.dart';
 import 'package:uptmdigital_app/screens/login_screen.dart';
+import 'package:uptmdigital_app/screens/subject_selection_screen.dart';
+import 'package:uptmdigital_app/screens/academic_hierarchy_screen.dart';
 // Reuse for now, will filter later
 import 'package:uptmdigital_app/screens/notas_screen.dart';
 import 'package:uptmdigital_app/screens/asistencias_screen.dart';
@@ -12,6 +15,8 @@ import 'package:uptmdigital_app/screens/horarios_screen.dart';
 import 'package:uptmdigital_app/screens/inbox_screen.dart';
 import 'package:uptmdigital_app/widgets/institutional_card.dart';
 import 'package:uptmdigital_app/widgets/menu_bottom_sheet.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import 'dart:convert';
 
 
@@ -54,6 +59,15 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
 
     // 2. Cargar de red para actualizar
     final data = await api.getUserMe();
+    
+    // Fallback: Si no tiene el perfil de profesor en /me, intentar recuperarlo
+    if (mounted && data != null && data['idProfesor'] == null) {
+      debugPrint("ProfessorDashboard: idProfesor null en /me, intentando fallback");
+      final professorProfile = await api.getCoordinadorMe(); // El coordinador suele compartir datos de profesor o tener endpoint similar
+      // Nota: Si no hay un endpoint específico getProfessorMe, usaremos la data que tengamos.
+      // Pero idealmente el backend debería ya haber linkeado.
+    }
+
     if (mounted && data != null) {
       setState(() {
         _professorData = data;
@@ -90,6 +104,43 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
         ],
       ),
     );
+  }
+
+  Future<void> _pickProfileImage() async {
+    final picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 50);
+
+    if (image == null) return;
+
+    setState(() => _isLoading = true);
+
+    final file = File(image.path);
+    final idProfesor = _professorData!['idProfesor'];
+    if (idProfesor == null) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Error: ID de profesor no encontrado")));
+      setState(() => _isLoading = false);
+      return;
+    }
+    final fileName = "profile_prof_$idProfesor.jpg";
+
+    final url = await SupabaseService().uploadImage(file, fileName);
+
+    if (url != null) {
+      final success = await ApiService().updateProfesor(idProfesor, {
+        ..._professorData!,
+        'fotoUrl': url
+      });
+
+      if (success) {
+        _loadProfessorData();
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Foto de perfil actualizada")));
+      }
+    } else {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Error al subir imagen")));
+      }
+    }
   }
 
 
@@ -148,13 +199,29 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
         activePage = _buildHomeTab();
         break;
       case 1:
-        activePage = HorariosScreen(isAdmin: false, professorId: _professorData!['idProfesor']);
+        // Enviar a selección de materia primero para horario
+        activePage = SubjectSelectionScreen(
+          target: AcademicTarget.horarios, 
+          professorId: _professorData!['idProfesor'],
+          carrera: _professorData!['carrera'],
+          semestre: {'idSemestre': 0, 'nombre': 'Mis Horarios'},
+        );
         break;
       case 2:
-        activePage = AsistenciasScreen(professorId: _professorData!['idProfesor']);
+        activePage = SubjectSelectionScreen(
+          target: AcademicTarget.asistencias, 
+          professorId: _professorData!['idProfesor'],
+          carrera: _professorData!['carrera'],
+          semestre: {'idSemestre': 0, 'nombre': 'Mis Asistencias'},
+        );
         break;
       case 3:
-        activePage = NotasScreen(professorId: _professorData!['idProfesor']);
+        activePage = SubjectSelectionScreen(
+          target: AcademicTarget.notas, 
+          professorId: _professorData!['idProfesor'],
+          carrera: _professorData!['carrera'],
+          semestre: {'idSemestre': 0, 'nombre': 'Mis Calificaciones'},
+        );
         break;
       default:
         activePage = _buildHomeTab();
@@ -246,13 +313,31 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
         InstitutionalCard(
           child: Row(
             children: [
-              CircleAvatar(
-                radius: 30,
-                backgroundColor: AppTheme.secondary.withValues(alpha: 0.1),
-                backgroundImage: _professorData!['fotoUrl'] != null ? NetworkImage(_professorData!['fotoUrl']) : null,
-                child: _professorData!['fotoUrl'] == null 
-                    ? Text(_professorData!['nombres'][0], style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.secondary))
-                    : null,
+              Stack(
+                children: [
+                  CircleAvatar(
+                    radius: 35,
+                    backgroundColor: AppTheme.secondary.withValues(alpha: 0.1),
+                    backgroundImage: (_professorData!['fotoUrl'] != null && _professorData!['fotoUrl'].toString().isNotEmpty) 
+                        ? NetworkImage(_professorData!['fotoUrl']) 
+                        : null,
+                    child: (_professorData!['fotoUrl'] == null || _professorData!['fotoUrl'].toString().isEmpty) 
+                        ? Text(_professorData!['nombres'][0], style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.secondary))
+                        : null,
+                  ),
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: CircleAvatar(
+                      radius: 12,
+                      backgroundColor: AppTheme.primary,
+                      child: InkWell(
+                        onTap: _pickProfileImage,
+                        child: const Icon(Icons.camera_alt, size: 14, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(width: 16),
               Expanded(

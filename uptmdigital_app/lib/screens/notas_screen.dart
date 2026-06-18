@@ -30,6 +30,10 @@ class _NotasScreenState extends State<NotasScreen> {
 
   Future<void> _loadNotas() async {
     setState(() => _isLoading = true);
+    
+    // Si no tenemos asignaturaId y somos profesor, deberíamos forzar la selección
+    // Por ahora, si asignaturaId es null, traerá todo (comportamiento actual)
+
     final data = await ApiService().getNotas(
       search: _searchQuery.isEmpty ? null : _searchQuery,
       asignaturaId: widget.asignaturaId,

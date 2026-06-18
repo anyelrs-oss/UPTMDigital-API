@@ -46,15 +46,19 @@ class _SubjectSelectionScreenState extends State<SubjectSelectionScreen> {
 
     if (mounted) {
       setState(() {
-        // Filtramos por Carrera y Semestre/Trimestre
-        _asignaturas = all.where((a) =>
-          a['carreraId'] == widget.carrera['idCarrera'] &&
-          a['semestreId'] == widget.semestre['idSemestre']
-        ).toList();
+        if (widget.professorId != null && widget.carrera == null) {
+          // Flujo simplificado para profesor: No filtrar por carrera/semestre específico si no vienen
+          _asignaturas = all.where((a) => a['profesorId'] == widget.professorId).toList();
+        } else {
+          // Flujo estándar (Admin o selección jerárquica)
+          _asignaturas = all.where((a) =>
+            a['carreraId'] == widget.carrera?['idCarrera'] &&
+            a['semestreId'] == widget.semestre?['idSemestre']
+          ).toList();
 
-        // Si hay professorId, filtramos solo las suyas
-        if (widget.professorId != null) {
-          _asignaturas = _asignaturas.where((a) => a['profesorId'] == widget.professorId).toList();
+          if (widget.professorId != null) {
+            _asignaturas = _asignaturas.where((a) => a['profesorId'] == widget.professorId).toList();
+          }
         }
 
         _isLoading = false;
@@ -64,13 +68,16 @@ class _SubjectSelectionScreenState extends State<SubjectSelectionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final String title = widget.semestre?['nombre'] ?? "Mis Materias";
+    final String subtitle = widget.carrera?['nombre'] ?? "Selección Directa";
+
     return Scaffold(
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(widget.semestre['nombre'], style: const TextStyle(fontSize: 16)),
-            Text(widget.carrera['nombre'], style: const TextStyle(fontSize: 12)),
+            Text(title, style: const TextStyle(fontSize: 16)),
+            Text(subtitle, style: const TextStyle(fontSize: 12)),
           ],
         ),
       ),

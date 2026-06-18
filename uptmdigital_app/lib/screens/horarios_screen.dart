@@ -5,6 +5,7 @@ import 'package:uptmdigital_app/services/api_service.dart';
 import 'package:uptmdigital_app/screens/chat_screen.dart';
 import 'package:uptmdigital_app/screens/plan_evaluacion_screen.dart';
 import 'package:uptmdigital_app/screens/my_grades_screen.dart';
+import 'package:uptmdigital_app/theme.dart';
 
 import 'package:uptmdigital_app/screens/asistencias_screen.dart';
 import 'package:uptmdigital_app/screens/evaluar_screen.dart';
@@ -126,15 +127,42 @@ class _HorariosScreenState extends State<HorariosScreen> {
       child: Column(
         children: [
           ExpansionTile(
-            title: Text(a.nombre, style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text("${a.codigo} • Semestre ${a.semestreNombre}"),
-            children: list.map((h) => ListTile(
-              leading: Icon(Icons.access_time, size: 20, color: const Color(0xFFC9A84C)),
-              title: Text("${h['dia']}: ${h['horaInicio']} - ${h['horaFin']}"),
-              subtitle: Text("Aula: ${h['aula']}"),
-              trailing: widget.isAdmin
-                  ? IconButton(icon: const Icon(Icons.edit_outlined, color: Colors.blue), onPressed: () => _showEditAulaDialog(h))
-                  : null,
+            initiallyExpanded: true,
+            title: Text(a.nombre, style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary)),
+            subtitle: Text("${a.codigo} • Semestre ${a.semestreNombre}", style: const TextStyle(fontSize: 12)),
+            children: list.map((h) => Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey[200]!),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.access_time_filled, size: 24, color: Colors.orange),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("${h['dia']}", style: const TextStyle(fontWeight: FontWeight.bold)),
+                        Text("${h['horaInicio']} - ${h['horaFin']}", style: TextStyle(color: Colors.grey[700])),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
+                    child: Text("Aula: ${h['aula']}", style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary, fontSize: 12)),
+                  ),
+                  if (widget.isAdmin)
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined, color: Colors.blue, size: 20),
+                      onPressed: () => _showEditAulaDialog(h),
+                    ),
+                ],
+              ),
             )).toList(),
           ),
           if (widget.studentId != null || widget.professorId != null)

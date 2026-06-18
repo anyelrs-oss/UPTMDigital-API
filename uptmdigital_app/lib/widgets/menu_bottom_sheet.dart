@@ -20,6 +20,7 @@ import 'package:uptmdigital_app/screens/auditoria_main_screen.dart';
 import 'package:uptmdigital_app/screens/evaluar_screen.dart';
 import 'package:uptmdigital_app/screens/plan_evaluacion_screen.dart';
 import 'package:uptmdigital_app/screens/academic_hierarchy_screen.dart';
+import 'package:uptmdigital_app/screens/subject_selection_screen.dart';
 
 class MenuBottomSheet extends StatelessWidget {
   final String role; // 'admin', 'student', 'professor', 'security'
@@ -224,28 +225,36 @@ class MenuBottomSheet extends StatelessWidget {
               }},
               {'icon': Icons.assignment_turned_in, 'label': 'Evaluar', 'onTap': () {
                  if (hasData) {
-                   nav(AcademicHierarchyScreen(target: AcademicTarget.evaluar, professorId: userData!['idProfesor']));
+                   nav(SubjectSelectionScreen(
+                     target: AcademicTarget.evaluar, 
+                     professorId: userData!['idProfesor'],
+                     carrera: userData!['carrera'], // Asumiendo que viene en userData
+                     semestre: {'idSemestre': 0, 'nombre': 'Mis Materias'}, // Fallback si no hay estructura
+                   ));
                  } else {
                    notImpl();
                  }
               }},
               {'icon': Icons.assignment_outlined, 'label': 'Planificación', 'onTap': () {
                  if (hasData) {
-                   nav(AcademicHierarchyScreen(target: AcademicTarget.planificacion, professorId: userData!['idProfesor']));
+                   nav(SubjectSelectionScreen(
+                     target: AcademicTarget.planificacion, 
+                     professorId: userData!['idProfesor'],
+                     carrera: userData!['carrera'],
+                     semestre: {'idSemestre': 0, 'nombre': 'Mis Materias'},
+                   ));
                  } else {
                    notImpl();
                  }
               }},
               {'icon': Icons.list_alt, 'label': 'Asistencia', 'onTap': () {
                  if (hasData) {
-                   nav(AsistenciasScreen(professorId: userData!['idProfesor']));
-                 } else {
-                   notImpl();
-                 }
-              }},
-              {'icon': Icons.calendar_today, 'label': 'Horario', 'onTap': () {
-                 if (hasData) {
-                   nav(HorariosScreen(professorId: userData!['idProfesor']));
+                   nav(SubjectSelectionScreen(
+                     target: AcademicTarget.asistencias, 
+                     professorId: userData!['idProfesor'],
+                     carrera: userData!['carrera'],
+                     semestre: {'idSemestre': 0, 'nombre': 'Mis Materias'},
+                   ));
                  } else {
                    notImpl();
                  }

@@ -27,10 +27,19 @@ class _AsistenciasScreenState extends State<AsistenciasScreen> {
 
   Future<void> _loadAsistencias() async {
     setState(() => _isLoading = true);
-    final data = await ApiService().getAsistencias();
+    
+    final api = ApiService();
+    // Obtener todas las asistencias (o filtradas por profesor si el endpoint lo soporta)
+    final data = await api.getAsistencias();
+    
     if (mounted) {
       setState(() {
-        _asistencias = data;
+        // Filtrar localmente si tenemos asignaturaId
+        if (widget.asignaturaId != null) {
+          _asistencias = data.where((a) => a['asignaturaId'] == widget.asignaturaId).toList();
+        } else {
+          _asistencias = data;
+        }
         _isLoading = false;
       });
     }
@@ -67,10 +76,12 @@ class _AsistenciasScreenState extends State<AsistenciasScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isAdmin = widget.professorId == null;
+    final isAdmin = widget.professorId == null && widget.asignaturaId == null;
+    final String title = widget.asignaturaNombre ?? "Control de Asistencia";
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Control de Asistencia"),
+        title: Text(title),
         actions: [
           PopupMenuButton<String>(
             icon: const Icon(Icons.download),
