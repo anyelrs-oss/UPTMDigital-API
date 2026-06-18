@@ -122,10 +122,10 @@ class _PlanEvaluacionScreenState extends State<PlanEvaluacionScreen> {
         });
       }
 
-      final ok = await api.savePlanEvaluacion(widget.asignaturaId, payload);
+      final res = await api.savePlanEvaluacion(widget.asignaturaId, payload);
 
-      if (!ok) {
-        throw Exception("Error al guardar plan");
+      if (!res['success']) {
+        throw Exception(res['message']);
       }
 
       if (mounted) {
@@ -133,7 +133,16 @@ class _PlanEvaluacionScreenState extends State<PlanEvaluacionScreen> {
         Navigator.pop(context);
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Error al guardar el plan")));
+      final msg = e.toString().replaceFirst("Exception: ", "");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Error: $msg"), 
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 6),
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

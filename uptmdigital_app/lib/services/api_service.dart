@@ -814,13 +814,26 @@ class ApiService {
     }
   }
 
-  Future<bool> savePlanEvaluacion(int asignaturaId, List<Map<String, dynamic>> evaluations) async {
+  Future<Map<String, dynamic>> savePlanEvaluacion(int asignaturaId, List<Map<String, dynamic>> evaluations) async {
     try {
       final response = await _dio.post('/api/evaluaciones/bulk/$asignaturaId', data: evaluations);
-      return response.statusCode == 200;
+      return {
+        'success': response.statusCode == 200,
+        'message': response.data?['message'] ?? 'Plan guardado'
+      };
+    } on DioException catch (e) {
+      debugPrint("Dio error saving bulk evaluation plan: ${e.response?.data ?? e.message}");
+      final errorMsg = e.response?.data?.toString() ?? e.message ?? 'Error de conexión';
+      return {
+        'success': false,
+        'message': errorMsg
+      };
     } catch (e) {
       debugPrint("Error saving bulk evaluation plan: $e");
-      return false;
+      return {
+        'success': false,
+        'message': e.toString()
+      };
     }
   }
 
