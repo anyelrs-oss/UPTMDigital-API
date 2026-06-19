@@ -194,38 +194,38 @@ namespace UPTMDigital.API.Controllers
         [HttpPost]
         public async Task<ActionResult<Mensaje>> PostMensaje(Mensaje mensaje)
         {
-            // Set UsuarioId from JWT
-            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (!string.IsNullOrEmpty(userIdStr) && int.TryParse(userIdStr, out var userId))
+            try
             {
-                mensaje.UsuarioId = userId;
-            }
+                // Set UsuarioId from JWT
+                var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (!string.IsNullOrEmpty(userIdStr) && int.TryParse(userIdStr, out var userId))
+                {
+                    mensaje.UsuarioId = userId;
+                }
 
-            // Autopopular EmisorNombre si viene vacío o nulo
-            if (string.IsNullOrEmpty(mensaje.EmisorNombre) && mensaje.UsuarioId > 0)
-            {
-                var user = await _context.Usuarios.FindAsync(mensaje.UsuarioId);
-                mensaje.EmisorNombre = user?.NombreUsuario ?? "Usuario";
-            }
+                // Autopopular EmisorNombre si viene vacío o nulo
+                if (string.IsNullOrEmpty(mensaje.EmisorNombre) && mensaje.UsuarioId > 0)
+                {
+                    var user = await _context.Usuarios.FindAsync(mensaje.UsuarioId);
+                    mensaje.EmisorNombre = user?.NombreUsuario ?? "Usuario";
+                }
 
-            mensaje.FechaEnvio = DateTime.UtcNow;
-            _context.Mensajes.Add(mensaje);
-            await _context.SaveChangesAsync();
+                mensaje.FechaEnvio = DateTime.UtcNow;
+                _context.Mensajes.Add(mensaje);
+                await _context.SaveChangesAsync();
 
-            if (mensaje.TipoChat == "Asignatura" && mensaje.AsignaturaId.HasValue)
-            {
-                return CreatedAtAction(nameof(GetMensajes), new { asignaturaId = mensaje.AsignaturaId.Value }, mensaje);
+                return Ok(mensaje);
             }
-            else if (mensaje.TipoChat == "Carrera" && mensaje.CarreraId.HasValue)
+            catch (Exception ex)
             {
-                return CreatedAtAction(nameof(GetMensajesCarrera), new { carreraId = mensaje.CarreraId.Value }, mensaje);
+                Console.WriteLine($"[ERROR PostMensaje] Exception: {ex.Message}");
+                Console.WriteLine($"[ERROR PostMensaje] StackTrace: {ex.StackTrace}");
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"[ERROR PostMensaje] Inner: {ex.InnerException.Message}");
+                }
+                return StatusCode(500, $"Error interno al enviar mensaje: {ex.Message}");
             }
-            else if (mensaje.TipoChat == "Privado" && mensaje.ReceptorUsuarioId.HasValue)
-            {
-                return CreatedAtAction(nameof(GetMensajesPrivados), new { peerUserId = mensaje.ReceptorUsuarioId.Value }, mensaje);
-            }
-
-            return Ok(mensaje);
         }
     }
 }
