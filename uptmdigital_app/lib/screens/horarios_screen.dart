@@ -43,6 +43,18 @@ class _HorariosScreenState extends State<HorariosScreen> {
     _loadData();
   }
 
+  String _normalize(String str) {
+    return str
+        .toLowerCase()
+        .replaceAll('á', 'a')
+        .replaceAll('é', 'e')
+        .replaceAll('í', 'i')
+        .replaceAll('ó', 'o')
+        .replaceAll('ú', 'u')
+        .replaceAll('ü', 'u')
+        .replaceAll('ñ', 'n');
+  }
+
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     final api = ApiService();
@@ -61,12 +73,67 @@ class _HorariosScreenState extends State<HorariosScreen> {
           departamento: "",
         )];
       } else {
-        // Carga completa (antigua, lenta)
-        final all = await api.getAsignaturas();
-        var list = all.map<Asignatura>((json) => Asignatura.fromJson(json)).toList();
+        // Carga completa con filtrado inteligente
+        var list = <Asignatura>[];
+        final userRole = await api.storage.read(key: 'user_role');
 
-        if (widget.professorId != null) {
-          list = list.where((a) => a.profesorId == widget.professorId).toList();
+        if (userRole == 'Estudiante') {
+          // 1. Obtener inscripciones del estudiante
+          final inscripciones = await api.getStudentInscripcionesMe();
+
+          if (inscripciones.isNotEmpty) {
+            // Si el estudiante tiene inscripciones, mostramos solo las materias en las que está inscrito
+            final enrolledIds = inscripciones
+                .map((ins) => ins['asignaturaId'] as int?)
+                .where((id) => id != null)
+                .cast<int>()
+                .toSet();
+
+            final all = await api.getAsignaturas();
+            list = all
+                .map<Asignatura>((json) => Asignatura.fromJson(json))
+                .where((a) => enrolledIds.contains(a.idAsignatura))
+                .toList();
+          } else {
+            // Si no tiene inscripciones, mostramos las materias de su carrera (departamento)
+            var carreraNombre = await api.storage.read(key: 'carrera_nombre');
+            final carreraIdStr = await api.storage.read(key: 'carrera_id');
+            final int? carreraId = carreraIdStr != null ? int.tryParse(carreraIdStr) : null;
+
+            if (carreraNombre == null || carreraNombre.isEmpty) {
+              final me = await api.getUserMe();
+              if (me != null && me['carrera'] != null && me['carrera']['nombre'] != null) {
+                carreraNombre = me['carrera']['nombre'].toString();
+              }
+            }
+
+            final all = await api.getAsignaturas();
+            final mapped = all.map<Asignatura>((json) => Asignatura.fromJson(json)).toList();
+
+            if (carreraId != null || (carreraNombre != null && carreraNombre.isNotEmpty)) {
+              final normCarrera = carreraNombre != null ? _normalize(carreraNombre) : '';
+              list = mapped.where((a) {
+                if (carreraId != null && a.carreraId == carreraId) {
+                  return true;
+                }
+                if (normCarrera.isNotEmpty && _normalize(a.departamento) == normCarrera) {
+                  return true;
+                }
+                return false;
+              }).toList();
+            } else {
+              list = []; // Si no hay carrera ni inscripciones, no mostramos nada
+            }
+          }
+        } else {
+          // Para otros roles (Coordinador, Profesor, Administrador)
+          final all = await api.getAsignaturas();
+          var temp = all.map<Asignatura>((json) => Asignatura.fromJson(json)).toList();
+
+          if (widget.professorId != null) {
+            temp = temp.where((a) => a.profesorId == widget.professorId).toList();
+          }
+          list = temp;
         }
 
         _asignaturas = list;

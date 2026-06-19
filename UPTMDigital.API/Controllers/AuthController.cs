@@ -210,6 +210,7 @@ namespace UPTMDigital.API.Controllers
             // 6. Create Profile (Estudiante, Profesor, or none for Seguridad)
             if (roleName == "Estudiante")
             {
+                var carrera = await _context.Carreras.FirstOrDefaultAsync(c => c.Nombre == institutionalRecord.CarreraDepartamento);
                 _context.Estudiantes.Add(new Estudiante
                 {
                     Cedula = institutionalRecord.Cedula,
@@ -217,7 +218,8 @@ namespace UPTMDigital.API.Controllers
                     Apellidos = institutionalRecord.Apellidos,
                     CorreoInstitucional = institutionalRecord.CorreoInstitucional,
                     UsuarioId = newUser.IdUsuario,
-                    FechaRegistro = DateTime.UtcNow
+                    FechaRegistro = DateTime.UtcNow,
+                    CarreraId = carrera?.IdCarrera
                 });
             }
             else if (roleName == "Profesor")
@@ -277,7 +279,24 @@ namespace UPTMDigital.API.Controllers
 
             if (roleName == "Estudiante")
             {
-                perfil = await _context.Estudiantes.FirstOrDefaultAsync(e => e.UsuarioId == userId);
+                var est = await _context.Estudiantes.Include(e => e.Carrera).FirstOrDefaultAsync(e => e.UsuarioId == userId);
+                if (est != null && est.CarreraId == null)
+                {
+                    // Auto-heal CarreraId
+                    var record = await _context.RegistrosInstitucionales.FirstOrDefaultAsync(r => r.Cedula == est.Cedula);
+                    if (record != null && !string.IsNullOrEmpty(record.CarreraDepartamento))
+                    {
+                        var carrera = await _context.Carreras.FirstOrDefaultAsync(c => c.Nombre == record.CarreraDepartamento);
+                        if (carrera != null)
+                        {
+                            est.CarreraId = carrera.IdCarrera;
+                            _context.Entry(est).State = EntityState.Modified;
+                            await _context.SaveChangesAsync();
+                            est.Carrera = carrera;
+                        }
+                    }
+                }
+                perfil = est;
             }
             else if (roleName == "Profesor")
             {

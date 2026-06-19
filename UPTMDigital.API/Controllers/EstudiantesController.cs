@@ -76,8 +76,25 @@ namespace UPTMDigital.API.Controllers
             try
             {
                 estudiante = await _context.Estudiantes
-                    .AsNoTracking()
+                    .Include(e => e.Carrera)
                     .FirstOrDefaultAsync(e => e.UsuarioId == userId);
+
+                if (estudiante != null && estudiante.CarreraId == null)
+                {
+                    // Auto-heal CarreraId
+                    var record = await _context.RegistrosInstitucionales.FirstOrDefaultAsync(r => r.Cedula == estudiante.Cedula);
+                    if (record != null && !string.IsNullOrEmpty(record.CarreraDepartamento))
+                    {
+                        var carrera = await _context.Carreras.FirstOrDefaultAsync(c => c.Nombre == record.CarreraDepartamento);
+                        if (carrera != null)
+                        {
+                            estudiante.CarreraId = carrera.IdCarrera;
+                            _context.Entry(estudiante).State = EntityState.Modified;
+                            await _context.SaveChangesAsync();
+                            estudiante.Carrera = carrera;
+                        }
+                    }
+                }
             }
             catch (Exception ex) when (IsTransientDbException(ex))
             {
