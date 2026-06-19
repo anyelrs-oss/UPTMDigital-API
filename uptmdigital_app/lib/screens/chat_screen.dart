@@ -121,9 +121,11 @@ class _ChatScreenState extends State<ChatScreen> {
 
     // Usamos la API para mantener consistencia y auditoría,
     // pero Supabase Realtime detectará el insert en la BD y actualizará a todos.
-    final success = await ApiService().sendMensaje(data);
-    if (!success) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Error al enviar mensaje")));
+    final result = await ApiService().sendMensaje(data);
+    if (!result['success']) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error al enviar mensaje: ${result['message']}")),
+      );
     }
   }
 

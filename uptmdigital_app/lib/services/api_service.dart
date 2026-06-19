@@ -735,12 +735,17 @@ class ApiService {
     }
   }
 
-  Future<bool> sendMensaje(Map<String, dynamic> data) async {
+  Future<Map<String, dynamic>> sendMensaje(Map<String, dynamic> data) async {
     try {
       await _dio.post('/api/mensajes', data: data);
-      return true;
+      return {'success': true};
+    } on DioException catch (e) {
+      final errorMsg = e.response?.data is String
+          ? e.response?.data
+          : (e.response?.data?['message'] ?? e.response?.data?['Message'] ?? e.message);
+      return {'success': false, 'message': errorMsg ?? 'Error de conexión'};
     } catch (e) {
-      return false;
+      return {'success': false, 'message': e.toString()};
     }
   }
 

@@ -227,13 +227,13 @@ class _CoordinatorDashboardState extends State<CoordinatorDashboard> {
                     label: const Text("Enviar Chat"),
                     onPressed: () async {
                       final coordName = "${_coordData?['nombres'] ?? ''} ${_coordData?['apellidos'] ?? ''}".trim();
-                      final success = await ApiService().sendMensaje({
+                      final result = await ApiService().sendMensaje({
                         "CarreraId": _coordData?['carreraId'],
                         "Contenido": "Hola profesores, el PIN de asistencia para el día de hoy es: $pin",
                         "TipoChat": "Carrera",
                         "EmisorNombre": coordName.isNotEmpty ? coordName : (_coordData?['nombreUsuario'] ?? "Coordinador"),
                       });
-                      if (success) {
+                      if (result['success']) {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text("PIN compartido en el chat de la carrera")),
@@ -242,7 +242,7 @@ class _CoordinatorDashboardState extends State<CoordinatorDashboard> {
                       } else {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text("Error al enviar el PIN al chat")),
+                            SnackBar(content: Text("Error al enviar el PIN al chat: ${result['message']}")),
                           );
                         }
                       }
