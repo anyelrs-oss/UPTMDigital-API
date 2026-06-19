@@ -89,7 +89,16 @@ namespace UPTMDigital.API.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"Error al guardar el plan de evaluación: {ex.Message}");
+                var detailedError = ex.Message;
+                if (ex.InnerException != null)
+                {
+                    detailedError += $"\nInner: {ex.InnerException.Message}";
+                    if (ex.InnerException.InnerException != null)
+                    {
+                        detailedError += $"\nRoot: {ex.InnerException.InnerException.Message}";
+                    }
+                }
+                return StatusCode(500, $"Error al guardar el plan de evaluación: {detailedError}");
             }
         }
 
