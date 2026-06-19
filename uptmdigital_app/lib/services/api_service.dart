@@ -541,10 +541,8 @@ class ApiService {
   /// Borra toda la información de sesión del dispositivo.
   /// Llamar siempre cuando el usuario hace logout explícito.
   Future<void> logout() async {
-    await storage.delete(key: 'jwt_token');
-    await storage.delete(key: 'user_role');
-    await storage.delete(key: 'user_id');
-    await storage.delete(key: 'username');
+    _memoryCache.clear();
+    await storage.deleteAll();
   }
 
   /// Retorna true si hay un token guardado en el dispositivo.

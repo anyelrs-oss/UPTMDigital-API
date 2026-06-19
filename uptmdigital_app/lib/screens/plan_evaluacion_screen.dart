@@ -199,7 +199,7 @@ class _PlanEvaluacionScreenState extends State<PlanEvaluacionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Plan: ${widget.asignaturaNombre}")),
+      appBar: AppBar(title: Text("Plan: ${widget.asignaturaNombre} (ID: ${widget.asignaturaId})")),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -304,6 +304,8 @@ class _PlanEvaluacionScreenState extends State<PlanEvaluacionScreen> {
 
   Widget _buildEvalRow(int index) {
     final e = _evaluaciones[index];
+    final bool isPublished = e.containsKey('idEvaluacion');
+
     return InstitutionalCard(
       margin: const EdgeInsets.only(bottom: 12),
       child: Column(
@@ -314,7 +316,7 @@ class _PlanEvaluacionScreenState extends State<PlanEvaluacionScreen> {
                 flex: 3, 
                 child: TextField(
                   controller: e['nombre'], 
-                  readOnly: widget.isReadOnly,
+                  readOnly: widget.isReadOnly || isPublished,
                   decoration: const InputDecoration(labelText: "Evaluación (Ej: Taller 1)")
                 )
               ),
@@ -323,12 +325,13 @@ class _PlanEvaluacionScreenState extends State<PlanEvaluacionScreen> {
                 flex: 1, 
                 child: TextField(
                   controller: e['ponderacion'], 
-                  readOnly: widget.isReadOnly,
+                  readOnly: widget.isReadOnly || isPublished, // Bloquear si ya existe o es solo lectura
                   decoration: const InputDecoration(labelText: "%"), 
-                  keyboardType: TextInputType.number
+                  keyboardType: TextInputType.number,
+                  style: TextStyle(color: (widget.isReadOnly || isPublished) ? Colors.grey : Colors.black),
                 )
               ),
-              if (!widget.isReadOnly)
+              if (!widget.isReadOnly && !isPublished)
                 IconButton(
                   icon: const Icon(Icons.delete_outline, color: Colors.red), 
                   onPressed: () => setState(() => _evaluaciones.removeAt(index))
@@ -340,8 +343,8 @@ class _PlanEvaluacionScreenState extends State<PlanEvaluacionScreen> {
             onTap: widget.isReadOnly ? null : () async {
               final picked = await showDatePicker(
                 context: context,
-                initialDate: e['fecha'],
-                firstDate: DateTime.now().subtract(const Duration(days: 365)), // Permitir modificar fechas pasadas/presentes
+                initialDate: (e['fecha'] as DateTime).isBefore(DateTime.now()) ? DateTime.now() : e['fecha'],
+                firstDate: DateTime.now(), // Bloquear fechas pasadas
                 lastDate: DateTime.now().add(const Duration(days: 365)),
               );
               if (picked != null) setState(() => e['fecha'] = picked);
@@ -353,6 +356,8 @@ class _PlanEvaluacionScreenState extends State<PlanEvaluacionScreen> {
                   const Icon(Icons.calendar_month_outlined, size: 18, color: Colors.grey),
                   const SizedBox(width: 8),
                   Text("Fecha programada: ${(e['fecha'] as DateTime).day}/${(e['fecha'] as DateTime).month}/${(e['fecha'] as DateTime).year}"),
+                  const Spacer(),
+                  if (!widget.isReadOnly) const Icon(Icons.edit_calendar, size: 16, color: AppTheme.primary),
                 ],
               ),
             ),

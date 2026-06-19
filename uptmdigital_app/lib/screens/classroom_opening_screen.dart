@@ -105,17 +105,18 @@ class _ClassroomOpeningScreenState extends State<ClassroomOpeningScreen> {
 
   Widget _buildStatusBanner() {
     final String estado = _solicitudActiva['estado'];
+    final String tipo = _solicitudActiva['tipo'] ?? 'Apertura';
     Color color = Colors.orange;
-    String texto = "Pendiente — Esperando respuesta de seguridad";
+    String texto = "Pendiente — Esperando respuesta de seguridad ($tipo)";
     IconData icon = Icons.timer_outlined;
 
     if (estado == 'EnCamino') {
       color = Colors.blue;
-      texto = "En camino — Un oficial va hacia el aula";
+      texto = "En camino — Un oficial va hacia el aula ($tipo)";
       icon = Icons.directions_run;
     } else if (estado == 'Completada') {
       color = Colors.green;
-      texto = "Completada — El aula ha sido abierta";
+      texto = "Completada — El aula ha sido ${tipo == 'Apertura' ? 'abierta' : 'cerrada'}";
       icon = Icons.check_circle_outline;
     }
 
@@ -146,12 +147,26 @@ class _ClassroomOpeningScreenState extends State<ClassroomOpeningScreen> {
         title: Text(a['nombre'], style: const TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text("${a['edificio']} — Piso ${a['piso']}"),
         trailing: isOcupada
-            ? const Chip(label: Text("Ocupada"), backgroundColor: Colors.redAccent, labelStyle: TextStyle(color: Colors.white, fontSize: 10))
+            ? ElevatedButton(
+                onPressed: _solicitudActiva != null ? null : () => _solicitarCierre(a['idAula']),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+                child: const Text("Solicitar Cierre"),
+              )
             : ElevatedButton(
                 onPressed: _solicitudActiva != null ? null : () => _solicitar(a['idAula']),
                 child: const Text("Solicitar"),
               ),
       ),
     );
+  }
+
+  void _solicitarCierre(int aulaId) async {
+    final res = await ApiService().solicitarApertura(aulaId, "Solicitud de cierre de aula");
+    // Nota: Reutilizamos solicitarApertura pero con motivo de cierre. 
+    // Idealmente la API debería tener un campo 'tipo' o manejar el motivo.
+    if (res != null) {
+      setState(() => _solicitudActiva = {...res, 'tipo': 'Cierre'});
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Solicitud de cierre enviada")));
+    }
   }
 }

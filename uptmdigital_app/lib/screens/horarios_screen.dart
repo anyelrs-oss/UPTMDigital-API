@@ -9,6 +9,7 @@ import 'package:uptmdigital_app/theme.dart';
 
 import 'package:uptmdigital_app/screens/asistencias_screen.dart';
 import 'package:uptmdigital_app/screens/evaluar_screen.dart';
+import 'package:uptmdigital_app/screens/notas_screen.dart';
 
 class HorariosScreen extends StatefulWidget {
   final bool isAdmin;
@@ -212,7 +213,7 @@ class _HorariosScreenState extends State<HorariosScreen> {
           ),
           if (widget.studentId != null || widget.professorId != null)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: widget.studentId != null 
@@ -228,7 +229,6 @@ class _HorariosScreenState extends State<HorariosScreen> {
                       Navigator.push(context, MaterialPageRoute(builder: (_) => PlanEvaluacionScreen(
                         asignaturaId: a.idAsignatura,
                         asignaturaNombre: a.nombre,
-                        isReadOnly: true,
                       )));
                     }),
                     _buildQuickAction(Icons.grade_outlined, "Notas", () {
@@ -249,10 +249,10 @@ class _HorariosScreenState extends State<HorariosScreen> {
                         asignaturaNombre: a.nombre,
                       )));
                     }),
-                    _buildQuickAction(Icons.list_alt, "Asistencia", () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => AsistenciasScreen(
-                        asignaturaId: a.idAsignatura,
-                        asignaturaNombre: a.nombre,
+                    _buildQuickAction(Icons.grade_outlined, "Notas", () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => NotasScreen(
+                        asignaturaId: a.idAsignatura, 
+                        asignaturaNombre: a.nombre
                       )));
                     }),
                   ],
