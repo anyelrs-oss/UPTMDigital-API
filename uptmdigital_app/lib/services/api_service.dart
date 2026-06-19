@@ -414,6 +414,15 @@ class ApiService {
     }
   }
 
+  Future<Map<String, dynamic>?> getNotasConsolidado(int asignaturaId) async {
+    try {
+      final response = await _dio.get('/api/notas/consolidado/$asignaturaId');
+      return response.statusCode == 200 ? response.data as Map<String, dynamic> : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   Future<bool> createNota(Map<String, dynamic> data) async {
     try {
       await _dio.post('/api/notas', data: data);

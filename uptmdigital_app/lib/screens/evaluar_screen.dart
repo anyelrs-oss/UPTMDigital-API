@@ -21,6 +21,7 @@ class _EvaluarScreenState extends State<EvaluarScreen> {
   List<dynamic> _planEvaluacion = [];
   dynamic _selectedEval;
   bool _isLoading = true;
+  bool _isConfirmed = false;
   final Map<int, TextEditingController> _notasControllers = {};
 
   @override
@@ -31,11 +32,13 @@ class _EvaluarScreenState extends State<EvaluarScreen> {
 
   Future<void> _loadInitialData() async {
     final api = ApiService();
+    final confirmado = await api.getGlobalSetting("Confirmado_Asignatura_${widget.asignaturaId}");
     final plan = await api.getEvaluaciones(widget.asignaturaId);
     final alumnos = await api.getInscripcionesByAsignatura(widget.asignaturaId);
 
     if (mounted) {
       setState(() {
+        _isConfirmed = confirmado == "true";
         _planEvaluacion = plan;
         _estudiantes = alumnos;
         if (_planEvaluacion.isNotEmpty) _selectedEval = _planEvaluacion.first;
@@ -48,6 +51,7 @@ class _EvaluarScreenState extends State<EvaluarScreen> {
   }
 
   Future<void> _publicarNotas() async {
+    if (_isConfirmed) return;
     if (_selectedEval == null) return;
 
     // Validar que al menos haya una nota ingresada
@@ -126,7 +130,6 @@ class _EvaluarScreenState extends State<EvaluarScreen> {
       ),
     );
   }
-
   Widget _buildEstudianteRow(dynamic e) {
     final id = e['estudianteId'];
     final estudiante = e['estudiante'] ?? {};
@@ -139,6 +142,7 @@ class _EvaluarScreenState extends State<EvaluarScreen> {
           width: 70,
           child: TextField(
             controller: _notasControllers[id],
+            enabled: !_isConfirmed,
             keyboardType: TextInputType.number,
             textAlign: TextAlign.center,
             decoration: InputDecoration(
@@ -153,6 +157,26 @@ class _EvaluarScreenState extends State<EvaluarScreen> {
   }
 
   Widget _buildFooter() {
+    if (_isConfirmed) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.green.shade50,
+          border: Border(top: BorderSide(color: Colors.green.shade200)),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.check_circle, color: Colors.green),
+            SizedBox(width: 8),
+            Text(
+              "Calificaciones confirmadas definitivamente",
+              style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+      );
+    }
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: Colors.white, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, -5))]),

@@ -130,6 +130,73 @@ namespace UPTMDigital.API.Controllers
             return Ok(new { message = $"Se procesaron {dto.Notas.Count} notas exitosamente." });
         }
 
+        [HttpGet("consolidado/{asignaturaId}")]
+        public async Task<IActionResult> GetNotasConsolidado(int asignaturaId)
+        {
+            // 1. Obtener la asignatura y verificar que exista
+            var asignatura = await _context.Asignaturas.FindAsync(asignaturaId);
+            if (asignatura == null) return NotFound("Asignatura no encontrada.");
+
+            // 2. Obtener el plan de evaluación activo
+            var evaluaciones = await _context.EvaluacionesConfig
+                .Where(e => e.AsignaturaId == asignaturaId && e.Activo)
+                .OrderBy(e => e.FechaEvaluacion)
+                .ToListAsync();
+
+            // 3. Obtener los estudiantes inscritos de forma activa
+            var inscripciones = await _context.Inscripciones
+                .Include(i => i.Estudiante)
+                .Where(i => i.AsignaturaId == asignaturaId && i.Estado == "Activo")
+                .ToListAsync();
+
+            // 4. Obtener todas las notas registradas para esta asignatura
+            var notas = await _context.Notas
+                .Where(n => n.AsignaturaId == asignaturaId)
+                .ToListAsync();
+
+            // 5. Construir la estructura consolidada
+            var listaEstudiantes = new List<object>();
+
+            foreach (var ins in inscripciones)
+            {
+                var estudiante = ins.Estudiante;
+                var califs = new Dictionary<string, decimal?>();
+                decimal notaFinal = 0;
+
+                foreach (var eval in evaluaciones)
+                {
+                    var nota = notas.FirstOrDefault(n => n.EstudianteId == estudiante.IdEstudiante && n.EvaluacionId == eval.IdEvaluacion);
+                    califs[eval.IdEvaluacion.ToString()] = nota?.Calificacion;
+
+                    if (nota?.Calificacion != null)
+                    {
+                        notaFinal += (nota.Calificacion.Value * eval.Ponderacion) / 100;
+                    }
+                }
+
+                listaEstudiantes.Add(new
+                {
+                    estudianteId = estudiante.IdEstudiante,
+                    nombres = estudiante.Nombres,
+                    apellidos = estudiante.Apellidos,
+                    cedula = estudiante.Cedula,
+                    calificaciones = califs,
+                    notaFinal = Math.Round(notaFinal, 2)
+                });
+            }
+
+            return Ok(new
+            {
+                evaluaciones = evaluaciones.Select(e => new
+                {
+                    e.IdEvaluacion,
+                    e.Nombre,
+                    e.Ponderacion
+                }),
+                estudiantes = listaEstudiantes
+            });
+        }
+
         private bool NotaExists(int id) => _context.Notas.Any(e => e.IdNota == id);
     }
 

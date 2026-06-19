@@ -25,6 +25,9 @@ class _PlanEvaluacionScreenState extends State<PlanEvaluacionScreen> {
   bool _includeAttendance = false;
   double _attendancePoints = 0;
   bool _isLoading = false;
+  bool _isConfirmed = false;
+
+  bool get _effectiveReadOnly => widget.isReadOnly || _isConfirmed;
 
   @override
   void initState() {
@@ -36,6 +39,12 @@ class _PlanEvaluacionScreenState extends State<PlanEvaluacionScreen> {
     setState(() => _isLoading = true);
     try {
       final api = ApiService();
+      
+      final confirmado = await api.getGlobalSetting("Confirmado_Asignatura_${widget.asignaturaId}");
+      if (confirmado == "true") {
+        _isConfirmed = true;
+      }
+
       final evaluaciones = await api.getEvaluaciones(widget.asignaturaId);
       
       if (mounted) {
@@ -87,7 +96,7 @@ class _PlanEvaluacionScreenState extends State<PlanEvaluacionScreen> {
   }
 
   Future<void> _guardarPlan() async {
-    if (widget.isReadOnly) return;
+    if (_effectiveReadOnly) return;
 
     if (_totalPonderacion != 100) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -98,7 +107,6 @@ class _PlanEvaluacionScreenState extends State<PlanEvaluacionScreen> {
 
     setState(() => _isLoading = true);
     final api = ApiService();
-
     try {
       final List<Map<String, dynamic>> payload = [];
 
@@ -149,57 +157,36 @@ class _PlanEvaluacionScreenState extends State<PlanEvaluacionScreen> {
   }
 
   Future<void> _importFromPdf() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['pdf'],
-    );
-
+    final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['pdf']);
     if (result == null || result.files.single.path == null) return;
 
     setState(() => _isLoading = true);
     final api = ApiService();
-    final response = await api.extractEvaluationPlan(result.files.single.path!);
+    final res = await api.extractEvaluationPlan(result.files.single.path!);
     setState(() => _isLoading = false);
 
-    if (response != null && response['data'] != null) {
-      final List extracted = response['data'];
-      if (extracted.isEmpty) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("No se detectaron tablas claras. Intente un formato más legible.")));
-        return;
-      }
-
+    if (res != null && res['data'] != null) {
+      final List data = res['data'];
       setState(() {
         _evaluaciones.clear();
-        for (var item in extracted) {
-          final nombreCtrl = TextEditingController(text: item['nombre']);
-          final pondCtrl = TextEditingController(text: item['ponderacion'].toString());
-
-          // Parse date dd/mm/yyyy
-          DateTime date;
-          try {
-            final parts = item['fechaStr'].split('/');
-            date = DateTime(int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0]));
-          } catch (_) {
-            date = DateTime.now();
-          }
-
+        for (var item in data) {
           _evaluaciones.add({
-            "nombre": nombreCtrl,
-            "ponderacion": pondCtrl,
-            "fecha": date,
+            "nombre": TextEditingController(text: item['nombre']),
+            "ponderacion": TextEditingController(text: item['ponderacion'].toString()),
+            "fecha": DateTime.tryParse(item['fechaStr'] ?? '') ?? DateTime.now(),
           });
         }
       });
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Se extrajeron ${extracted.length} evaluaciones. Por favor verifique los datos.")));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Plan extraído del PDF.")));
     } else {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Error al procesar el archivo."), backgroundColor: Colors.red));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("No se pudo extraer el plan."), backgroundColor: Colors.red));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Plan: ${widget.asignaturaNombre} (ID: ${widget.asignaturaId})")),
+      appBar: AppBar(title: Text("Plan: ${widget.asignaturaNombre}")),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -210,7 +197,7 @@ class _PlanEvaluacionScreenState extends State<PlanEvaluacionScreen> {
                 title: const Text("Incluir Asistencia como nota"),
                 subtitle: const Text("Se restará del total de evaluaciones"),
                 value: _includeAttendance,
-                onChanged: widget.isReadOnly ? null : (val) => setState(() {
+                onChanged: _effectiveReadOnly ? null : (val) => setState(() {
                   _includeAttendance = val!;
                   if (_includeAttendance && _attendancePoints == 0) _attendancePoints = 10;
                 }),
@@ -228,7 +215,7 @@ class _PlanEvaluacionScreenState extends State<PlanEvaluacionScreen> {
                         value: _attendancePoints,
                         min: 0, max: 30, divisions: 6,
                         label: "${_attendancePoints.toInt()}%",
-                        onChanged: widget.isReadOnly ? null : (val) => setState(() => _attendancePoints = val),
+                        onChanged: _effectiveReadOnly ? null : (val) => setState(() => _attendancePoints = val),
                       ),
                     ),
                     Text("${_attendancePoints.toInt()}%", style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -243,7 +230,7 @@ class _PlanEvaluacionScreenState extends State<PlanEvaluacionScreen> {
               itemBuilder: (ctx, i) => _buildEvalRow(i),
             ),
             const SizedBox(height: 10),
-            if (!widget.isReadOnly) ...[
+            if (!_effectiveReadOnly) ...[
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
@@ -283,7 +270,7 @@ class _PlanEvaluacionScreenState extends State<PlanEvaluacionScreen> {
                 ],
               ),
             ),
-            if (!widget.isReadOnly) ...[
+            if (!_effectiveReadOnly) ...[
               const SizedBox(height: 30),
               SizedBox(
                 width: double.infinity,
@@ -292,6 +279,20 @@ class _PlanEvaluacionScreenState extends State<PlanEvaluacionScreen> {
                   onPressed: _isLoading ? null : _guardarPlan,
                   style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary, foregroundColor: Colors.white),
                   child: _isLoading ? const CircularProgressIndicator() : const Text("CARGAR PLAN COMPLETO"),
+                ),
+              ),
+            ] else if (_isConfirmed) ...[
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: Colors.green.shade100, borderRadius: BorderRadius.circular(8)),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.green),
+                    SizedBox(width: 8),
+                    Text("Calificaciones confirmadas definitivamente. Plan bloqueado.", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 13)),
+                  ],
                 ),
               ),
             ],
@@ -316,7 +317,7 @@ class _PlanEvaluacionScreenState extends State<PlanEvaluacionScreen> {
                 flex: 3, 
                 child: TextField(
                   controller: e['nombre'], 
-                  readOnly: widget.isReadOnly || isPublished,
+                  readOnly: _effectiveReadOnly || isPublished,
                   decoration: const InputDecoration(labelText: "Evaluación (Ej: Taller 1)")
                 )
               ),
@@ -325,13 +326,13 @@ class _PlanEvaluacionScreenState extends State<PlanEvaluacionScreen> {
                 flex: 1, 
                 child: TextField(
                   controller: e['ponderacion'], 
-                  readOnly: widget.isReadOnly || isPublished, // Bloquear si ya existe o es solo lectura
+                  readOnly: _effectiveReadOnly || isPublished,
                   decoration: const InputDecoration(labelText: "%"), 
                   keyboardType: TextInputType.number,
-                  style: TextStyle(color: (widget.isReadOnly || isPublished) ? Colors.grey : Colors.black),
+                  style: TextStyle(color: (_effectiveReadOnly || isPublished) ? Colors.grey : Colors.black),
                 )
               ),
-              if (!widget.isReadOnly && !isPublished)
+              if (!_effectiveReadOnly && !isPublished)
                 IconButton(
                   icon: const Icon(Icons.delete_outline, color: Colors.red), 
                   onPressed: () => setState(() => _evaluaciones.removeAt(index))
@@ -340,11 +341,11 @@ class _PlanEvaluacionScreenState extends State<PlanEvaluacionScreen> {
           ),
           const SizedBox(height: 8),
           InkWell(
-            onTap: widget.isReadOnly ? null : () async {
+            onTap: _effectiveReadOnly ? null : () async {
               final picked = await showDatePicker(
                 context: context,
                 initialDate: (e['fecha'] as DateTime).isBefore(DateTime.now()) ? DateTime.now() : e['fecha'],
-                firstDate: DateTime.now(), // Bloquear fechas pasadas
+                firstDate: DateTime.now(),
                 lastDate: DateTime.now().add(const Duration(days: 365)),
               );
               if (picked != null) setState(() => e['fecha'] = picked);
@@ -357,7 +358,7 @@ class _PlanEvaluacionScreenState extends State<PlanEvaluacionScreen> {
                   const SizedBox(width: 8),
                   Text("Fecha programada: ${(e['fecha'] as DateTime).day}/${(e['fecha'] as DateTime).month}/${(e['fecha'] as DateTime).year}"),
                   const Spacer(),
-                  if (!widget.isReadOnly) const Icon(Icons.edit_calendar, size: 16, color: AppTheme.primary),
+                  if (!_effectiveReadOnly) const Icon(Icons.edit_calendar, size: 16, color: AppTheme.primary),
                 ],
               ),
             ),
