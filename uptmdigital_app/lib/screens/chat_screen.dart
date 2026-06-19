@@ -166,7 +166,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
                     final msg = messages[index];
-                    final isMe = msg.emisorNombre == widget.userName;
+                    final isMe = msg.usuarioId == _myId || (msg.emisorNombre == _myRealName && _myRealName != null);
                     return _buildMessageBubble(msg, isMe);
                   },
                 );

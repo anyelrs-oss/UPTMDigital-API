@@ -17,6 +17,7 @@ class _ContactSearchScreenState extends State<ContactSearchScreen> {
   List<dynamic> _estudiantes = [];
   bool _isLoading = false;
   String _query = '';
+  String? _userRole;
 
   @override
   void initState() {
@@ -27,6 +28,10 @@ class _ContactSearchScreenState extends State<ContactSearchScreen> {
   Future<void> _loadInitial() async {
     setState(() => _isLoading = true);
     final api = ApiService();
+
+    final role = await api.storage.read(key: 'user_role');
+    final carreraNombre = await api.storage.read(key: 'carrera_nombre');
+    _userRole = role;
     
     // Si es profesor, cargamos sus estudiantes
     if (widget.professorId != null) {
@@ -53,6 +58,14 @@ class _ContactSearchScreenState extends State<ContactSearchScreen> {
         }
       }
       _estudiantes = myStudents;
+    } else if (role == 'Coordinador' && carreraNombre != null) {
+      final students = await api.getEstudiantes(carrera: carreraNombre, limit: 100);
+      _estudiantes = students.map((s) => {
+        'id': s['usuarioId'] ?? s['UsuarioId'], // El ID de usuario para el chat privado
+        'nombre': "${s['nombres'] ?? s['Nombres'] ?? ''} ${s['apellidos'] ?? s['Apellidos'] ?? ''}".trim(),
+        'rol': 'Estudiante',
+        'cedula': s['cedula'] ?? s['Cedula']
+      }).toList();
     }
 
     // Siempre permitimos buscar otros profesores
@@ -100,7 +113,7 @@ class _ContactSearchScreenState extends State<ContactSearchScreen> {
                       ...filteredProfs.map((p) => _ContactTile(contact: p)),
                     ],
                     if (filteredStudents.isNotEmpty) ...[
-                      const _SectionHeader(title: "MIS ESTUDIANTES"),
+                      _SectionHeader(title: _userRole == 'Coordinador' ? "ESTUDIANTES DE MI CARRERA" : "MIS ESTUDIANTES"),
                       ...filteredStudents.map((s) => _ContactTile(contact: s)),
                     ],
                     if (filteredProfs.isEmpty && filteredStudents.isEmpty)

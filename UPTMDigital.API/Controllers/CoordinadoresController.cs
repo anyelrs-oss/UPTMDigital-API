@@ -40,6 +40,20 @@ namespace UPTMDigital.API.Controllers
             var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
 
+            // Límite de 1 PIN por día por carrera (Hora de Venezuela UTC-4)
+            var todayUtc4 = DateTime.UtcNow.AddHours(-4).Date;
+            var minExpiracion = todayUtc4.AddHours(16);
+            var maxExpiracion = todayUtc4.AddHours(40);
+
+            var pinDeHoy = await _context.PinesAsistencia
+                .Where(p => p.CarreraId == request.CarreraId && p.Activo)
+                .FirstOrDefaultAsync(p => p.FechaExpiracion >= minExpiracion && p.FechaExpiracion < maxExpiracion);
+
+            if (pinDeHoy != null)
+            {
+                return Ok(pinDeHoy);
+            }
+
             // Desactivar pines anteriores para esta carrera
             var viejos = await _context.PinesAsistencia
                 .Where(p => p.CarreraId == request.CarreraId && p.Activo)

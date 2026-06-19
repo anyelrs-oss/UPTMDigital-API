@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:uptmdigital_app/services/api_service.dart';
 import 'package:uptmdigital_app/theme.dart';
 import 'package:uptmdigital_app/widgets/institutional_card.dart';
@@ -156,14 +157,112 @@ class _CoordinatorDashboardState extends State<CoordinatorDashboard> {
 
   void _generarPin() async {
     final res = await ApiService().generarPinAsistencia(_coordData?['carreraId']);
-    if (mounted && res['pin'] != null) {
+    final pin = res['pin'];
+    if (mounted && pin != null) {
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text("PIN Generado"),
-          content: Text(res['pin'], style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, letterSpacing: 4, color: Colors.red)),
-          actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cerrar"))],
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.vpn_key, color: AppTheme.primary),
+              SizedBox(width: 10),
+              Text("PIN de Asistencia", style: TextStyle(fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                "Este PIN es válido para la asistencia de hoy en los docentes de su carrera.",
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey, fontSize: 13),
+              ),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.red.shade200, width: 1.5),
+                ),
+                child: Text(
+                  pin,
+                  style: const TextStyle(
+                    fontSize: 38,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 6,
+                    color: Colors.red,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey.shade200,
+                      foregroundColor: Colors.black87,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                    ),
+                    icon: const Icon(Icons.copy, size: 18),
+                    label: const Text("Copiar"),
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: pin));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("PIN copiado al portapapeles")),
+                      );
+                    },
+                  ),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                    ),
+                    icon: const Icon(Icons.chat, size: 18),
+                    label: const Text("Enviar Chat"),
+                    onPressed: () async {
+                      final coordName = "${_coordData?['nombres'] ?? ''} ${_coordData?['apellidos'] ?? ''}".trim();
+                      final success = await ApiService().sendMensaje({
+                        "CarreraId": _coordData?['carreraId'],
+                        "Contenido": "Hola profesores, el PIN de asistencia para el día de hoy es: $pin",
+                        "TipoChat": "Carrera",
+                        "EmisorNombre": coordName.isNotEmpty ? coordName : (_coordData?['nombreUsuario'] ?? "Coordinador"),
+                      });
+                      if (success) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("PIN compartido en el chat de la carrera")),
+                          );
+                        }
+                      } else {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("Error al enviar el PIN al chat")),
+                          );
+                        }
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text("Cerrar", style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
         ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Error al generar el PIN de asistencia.")),
       );
     }
   }

@@ -23,16 +23,31 @@ class _GenerateQRScreenState extends State<GenerateQRScreen> {
   @override
   void initState() {
     super.initState();
-    _checkExistingValidation();
-    _loadAsignaturas();
+    _initData();
+  }
+
+  Future<void> _initData() async {
+    await _checkExistingValidation();
+    await _loadAsignaturas();
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _checkExistingValidation() async {
-    final lastValidation = await ApiService().storage.read(key: 'last_pin_validation_date');
-    final today = DateTime.now().toIso8601String().split('T')[0];
-    
-    if (lastValidation == today) {
-      if (mounted) setState(() => _pinValidated = true);
+    final storedPin = await ApiService().storage.read(key: 'last_validated_pin');
+    if (storedPin != null && storedPin.isNotEmpty) {
+      final success = await ApiService().validarPinDocente(storedPin);
+      if (success) {
+        if (mounted) {
+          setState(() {
+            _pinValidated = true;
+          });
+        }
+        return;
+      } else {
+        await ApiService().storage.delete(key: 'last_validated_pin');
+      }
     }
   }
 
@@ -42,7 +57,6 @@ class _GenerateQRScreenState extends State<GenerateQRScreen> {
       setState(() {
         final list = all.map<Asignatura>((j) => Asignatura.fromJson(j)).toList();
         _asignaturas = list.where((a) => a.profesorId == widget.professorId).toList();
-        _isLoading = false;
         if (_asignaturas.isNotEmpty) _selectedAsignatura = _asignaturas.first;
       });
     }
@@ -51,11 +65,11 @@ class _GenerateQRScreenState extends State<GenerateQRScreen> {
   Future<void> _validatePin() async {
     if (_pinController.text.isEmpty) return;
 
-    final success = await ApiService().validarPinDocente(_pinController.text);
+    final pin = _pinController.text;
+    final success = await ApiService().validarPinDocente(pin);
     if (success) {
-      // Guardar validación para hoy
-      final today = DateTime.now().toIso8601String().split('T')[0];
-      await ApiService().storage.write(key: 'last_pin_validation_date', value: today);
+      // Guardar el PIN validado para persistencia posterior
+      await ApiService().storage.write(key: 'last_validated_pin', value: pin);
 
       setState(() => _pinValidated = true);
     } else {

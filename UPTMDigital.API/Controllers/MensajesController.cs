@@ -188,7 +188,7 @@ namespace UPTMDigital.API.Controllers
         }
 
         /// <summary>
-        /// Envía un mensaje en el chat de una asignatura.
+        /// Envía un mensaje en el chat (Asignatura, Carrera o Privado).
         /// </summary>
         [Authorize]
         [HttpPost]
@@ -201,11 +201,31 @@ namespace UPTMDigital.API.Controllers
                 mensaje.UsuarioId = userId;
             }
 
+            // Autopopular EmisorNombre si viene vacío o nulo
+            if (string.IsNullOrEmpty(mensaje.EmisorNombre) && mensaje.UsuarioId > 0)
+            {
+                var user = await _context.Usuarios.FindAsync(mensaje.UsuarioId);
+                mensaje.EmisorNombre = user?.NombreUsuario ?? "Usuario";
+            }
+
             mensaje.FechaEnvio = DateTime.UtcNow;
             _context.Mensajes.Add(mensaje);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction("GetMensajes", new { asignaturaId = mensaje.AsignaturaId }, mensaje);
+            if (mensaje.TipoChat == "Asignatura" && mensaje.AsignaturaId.HasValue)
+            {
+                return CreatedAtAction(nameof(GetMensajes), new { asignaturaId = mensaje.AsignaturaId.Value }, mensaje);
+            }
+            else if (mensaje.TipoChat == "Carrera" && mensaje.CarreraId.HasValue)
+            {
+                return CreatedAtAction(nameof(GetMensajesCarrera), new { carreraId = mensaje.CarreraId.Value }, mensaje);
+            }
+            else if (mensaje.TipoChat == "Privado" && mensaje.ReceptorUsuarioId.HasValue)
+            {
+                return CreatedAtAction(nameof(GetMensajesPrivados), new { peerUserId = mensaje.ReceptorUsuarioId.Value }, mensaje);
+            }
+
+            return Ok(mensaje);
         }
     }
 }

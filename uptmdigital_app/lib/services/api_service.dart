@@ -588,6 +588,12 @@ class ApiService {
           if (userData.containsKey('idProfesor')) {
             await storage.write(key: 'profesor_id', value: userData['idProfesor'].toString());
           }
+          if (userData.containsKey('carreraId') && userData['carreraId'] != null) {
+            await storage.write(key: 'carrera_id', value: userData['carreraId'].toString());
+          }
+          if (userData.containsKey('carrera') && userData['carrera'] != null && userData['carrera']['nombre'] != null) {
+            await storage.write(key: 'carrera_nombre', value: userData['carrera']['nombre'].toString());
+          }
         }
 
         await storage.write(key: 'cached_user_me', value: jsonEncode(userData));
