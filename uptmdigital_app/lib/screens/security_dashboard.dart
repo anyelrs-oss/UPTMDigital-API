@@ -375,6 +375,10 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
 
   Widget _buildSolicitudItem(dynamic s) {
     final bool isEnCamino = s['estado'] == 'EnCamino';
+    final String motivo = s['motivo']?.toString().toLowerCase() ?? '';
+    final bool isCierre = motivo.contains('cierre');
+    final String tipoAccion = isCierre ? 'Cierre' : 'Apertura';
+    
     final String aulaNombre = s['aula']?['nombre'] ?? 'Aula';
     final String profesorNombre = s['profesor'] != null
         ? "${s['profesor']['nombres']} ${s['profesor']['apellidos']}"
@@ -390,12 +394,12 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: (isEnCamino ? Colors.blue : Colors.orange).withValues(alpha: 0.1),
+                  color: (isCierre ? Colors.red : (isEnCamino ? Colors.blue : Colors.orange)).withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  isEnCamino ? Icons.directions_run : Icons.priority_high,
-                  color: isEnCamino ? Colors.blue : Colors.orange,
+                  isCierre ? Icons.lock_outline : (isEnCamino ? Icons.directions_run : Icons.priority_high),
+                  color: isCierre ? Colors.red : (isEnCamino ? Colors.blue : Colors.orange),
                   size: 20,
                 ),
               ),
@@ -405,7 +409,7 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      "Apertura: $aulaNombre",
+                      "$tipoAccion: $aulaNombre",
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                     ),
                     Text(
@@ -436,11 +440,11 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
                       if (success) _loadSolicitudes();
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
+                      backgroundColor: isCierre ? Colors.redAccent : Colors.blue,
                       foregroundColor: Colors.white,
                       elevation: 0,
                     ),
-                    child: const Text("Voy en camino"),
+                    child: Text("Voy en camino ($tipoAccion)"),
                   ),
                 ),
               if (isEnCamino)
@@ -451,6 +455,7 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
                         builder: (_) => SecurityChecklistScreen(
                           solicitudId: s['idSolicitud'],
                           aulaNombre: aulaNombre,
+                          esCierre: isCierre,
                         )
                       )).then((_) => _loadSolicitudes());
                     },
@@ -459,7 +464,7 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
                       foregroundColor: Colors.white,
                       elevation: 0,
                     ),
-                    child: const Text("Realizar Chequeo"),
+                    child: Text("Realizar Chequeo (${isCierre ? 'Salida' : 'Entrada'})"),
                   ),
                 ),
             ],

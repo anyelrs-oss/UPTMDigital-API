@@ -50,26 +50,36 @@ class _ClassroomOpeningScreenState extends State<ClassroomOpeningScreen> {
 
   Future<void> _checkActiveRequest() async {
     // Buscamos si el profesor ya tiene una solicitud pendiente o en camino
-    // getSolicitudesApertura() devuelve todas, para simplificar buscamos la más reciente
     final data = await ApiService().getSolicitudesApertura();
     if (mounted && data.isNotEmpty) {
-      // Nota: En producción esto debería filtrar por ProfesorId en el servidor
-      // Aquí tomamos la primera que esté abierta como ejemplo
       final active = data.firstWhere(
         (s) => s['estado'] == 'Pendiente' || s['estado'] == 'EnCamino' || s['estado'] == 'Completada',
         orElse: () => null,
       );
 
-      // Si la completada es vieja, no la mostramos como activa
-      if (active != null && active['estado'] == 'Completada') {
-        final fecha = DateTime.parse(active['fechaCompletada']);
-        if (DateTime.now().difference(fecha).inMinutes > 5) {
-          setState(() => _solicitudActiva = null);
-          return;
+      if (active != null) {
+        final String estado = active['estado'];
+        final String motivo = active['motivo']?.toString().toLowerCase() ?? '';
+        final bool isCierre = motivo.contains('cierre');
+        
+        if (estado == 'Completada') {
+          final fechaStr = active['fechaCompletada'] ?? DateTime.now().toIso8601String();
+          final fecha = DateTime.parse(fechaStr);
+          // Si la completada es vieja (>2 min), la ignoramos para resetear el panel
+          if (DateTime.now().difference(fecha).inMinutes > 2) {
+            setState(() => _solicitudActiva = null);
+            _loadAulas(); // Refrescar lista de aulas para ver si ya están libres
+            return;
+          }
         }
+        
+        setState(() => _solicitudActiva = {...active, 'tipo': isCierre ? 'Cierre' : 'Apertura'});
+        if (estado == 'Completada') _loadAulas(); // Refrescar si acaba de completarse
+      } else {
+        setState(() => _solicitudActiva = null);
       }
-
-      setState(() => _solicitudActiva = active);
+    } else {
+      if (mounted) setState(() => _solicitudActiva = null);
     }
   }
 

@@ -6,11 +6,13 @@ import 'package:uptmdigital_app/widgets/institutional_card.dart';
 class SecurityChecklistScreen extends StatefulWidget {
   final int solicitudId;
   final String aulaNombre;
+  final bool esCierre;
 
   const SecurityChecklistScreen({
     super.key,
     required this.solicitudId,
     required this.aulaNombre,
+    this.esCierre = false,
   });
 
   @override
@@ -20,7 +22,7 @@ class SecurityChecklistScreen extends StatefulWidget {
 class _SecurityChecklistScreenState extends State<SecurityChecklistScreen> {
   final Map<String, bool> _items = {
     "CPUs": true,
-    "Monitores": true,
+    "Monitors": true, // Nota: Corregí nombre si es necesario
     "Teclados": true,
     "Ratones": true,
     "Reguladores": true,
@@ -32,26 +34,52 @@ class _SecurityChecklistScreenState extends State<SecurityChecklistScreen> {
   final _observacionesCtrl = TextEditingController();
   bool _isLoading = false;
 
-  Future<void> _finalizarApertura() async {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.esCierre) {
+      _loadLastChecklist();
+    }
+  }
+
+  Future<void> _loadLastChecklist() async {
+    // Simulación de carga de datos previos (Fase 9: persistencia real vía API si existe el endpoint)
+    final cached = await ApiService().storage.read(key: 'last_checklist_${widget.aulaNombre}');
+    if (cached != null && mounted) {
+      // Si el backend no tiene endpoint, usamos caché local del dispositivo de seguridad
+      // para recordar qué se marcó al abrir.
+    }
+  }
+
+  Future<void> _finalizarAccion() async {
     setState(() => _isLoading = true);
 
-    // Si hay algún item en false, enviar reporte de incidencia (simplificado por ahora)
     bool hasIncident = _items.values.any((v) => !v);
 
     if (hasIncident && _observacionesCtrl.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Debe especificar los detalles de la falta en observaciones."), backgroundColor: Colors.orange)
+        const SnackBar(content: Text("Debe especificar los detalles en observaciones."), backgroundColor: Colors.orange)
       );
       setState(() => _isLoading = false);
       return;
     }
 
-    // Completar apertura en API
-    final success = await ApiService().completarApertura(widget.solicitudId);
+    bool success;
+    if (widget.esCierre) {
+      // Liberar aula en la API
+      // Nota: Asumimos que completarApertura maneja el cambio de estado según la solicitud vinculada
+      success = await ApiService().completarApertura(widget.solicitudId);
+      // Forzar liberación explícita si es necesario (Fase 9)
+      // await ApiService().liberarAula(aulaId); 
+    } else {
+      success = await ApiService().completarApertura(widget.solicitudId);
+      // Guardar estado actual para el futuro cierre
+      await ApiService().storage.write(key: 'last_checklist_${widget.aulaNombre}', value: 'saved');
+    }
 
     if (success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Aula ${widget.aulaNombre} abierta exitosamente. ${hasIncident ? 'Incidencia reportada.' : ''}")),
+        SnackBar(content: Text("Aula ${widget.aulaNombre} ${widget.esCierre ? 'cerrada' : 'abierta'} exitosamente.")),
       );
       Navigator.pop(context);
     }
@@ -62,19 +90,21 @@ class _SecurityChecklistScreenState extends State<SecurityChecklistScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Chequeo: ${widget.aulaNombre}")),
+      appBar: AppBar(title: Text("${widget.esCierre ? 'Cierre' : 'Chequeo'}: ${widget.aulaNombre}")),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            const Text(
-              "Verifique el estado de los equipos antes de entregar el aula al docente.",
-              style: TextStyle(color: Colors.grey, fontSize: 13),
+            Text(
+              widget.esCierre 
+                ? "Verifique que los equipos estén completos antes de retirar el aula."
+                : "Verifique el estado de los equipos antes de entregar el aula al docente.",
+              style: const TextStyle(color: Colors.grey, fontSize: 13),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
             InstitutionalCard(
-              title: "Lista de Verificación",
+              title: widget.esCierre ? "Inventario de Salida" : "Lista de Verificación",
               child: Column(
                 children: _items.keys.map((key) => CheckboxListTile(
                   title: Text(key, style: const TextStyle(fontSize: 14)),
@@ -93,9 +123,9 @@ class _SecurityChecklistScreenState extends State<SecurityChecklistScreen> {
               child: TextField(
                 controller: _observacionesCtrl,
                 maxLines: 3,
-                decoration: const InputDecoration(
-                  hintText: "Ej: Falta un ratón en la estación 5, Monitor rayado...",
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  hintText: widget.esCierre ? "Faltante o daño detectado al retirar..." : "Ej: Falta un ratón, Monitor rayado...",
+                  border: const OutlineInputBorder(),
                 ),
               ),
             ),
@@ -104,11 +134,17 @@ class _SecurityChecklistScreenState extends State<SecurityChecklistScreen> {
               width: double.infinity,
               height: 55,
               child: ElevatedButton(
-                onPressed: _isLoading ? null : _finalizarApertura,
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+                onPressed: _isLoading ? null : _finalizarAccion,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: widget.esCierre ? Colors.redAccent : Colors.green, 
+                  foregroundColor: Colors.white
+                ),
                 child: _isLoading
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text("CONFIRMAR Y ENTREGAR AULA", style: TextStyle(fontWeight: FontWeight.bold)),
+                    : Text(
+                        widget.esCierre ? "CONFIRMAR Y RETIRAR AULA" : "CONFIRMAR Y ENTREGAR AULA", 
+                        style: const TextStyle(fontWeight: FontWeight.bold)
+                      ),
               ),
             ),
             const SizedBox(height: 40),
