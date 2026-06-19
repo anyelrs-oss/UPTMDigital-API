@@ -576,6 +576,19 @@ namespace UPTMDigital.API.Controllers
                 log.Add($"Clean null/empty Cedulas warning: {ex.Message}");
             }
 
+            // 0.5 Ensure Mensaje columns are nullable to allow Career and Private chats without AsignaturaId
+            try
+            {
+                await _context.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""Mensaje"" ALTER COLUMN ""AsignaturaId"" DROP NOT NULL;");
+                await _context.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""Mensaje"" ALTER COLUMN ""CarreraId"" DROP NOT NULL;");
+                await _context.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""Mensaje"" ALTER COLUMN ""ReceptorUsuarioId"" DROP NOT NULL;");
+                log.Add("Successfully ensured AsignaturaId, CarreraId and ReceptorUsuarioId are nullable in Mensaje table.");
+            }
+            catch (Exception ex)
+            {
+                log.Add($"Ensure nullable columns warning: {ex.Message}");
+            }
+
             // 1. Update Schema and Apply Migrations
             try
             {

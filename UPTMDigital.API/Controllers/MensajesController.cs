@@ -220,11 +220,13 @@ namespace UPTMDigital.API.Controllers
             {
                 Console.WriteLine($"[ERROR PostMensaje] Exception: {ex.Message}");
                 Console.WriteLine($"[ERROR PostMensaje] StackTrace: {ex.StackTrace}");
+                var fullMessage = ex.Message;
                 if (ex.InnerException != null)
                 {
                     Console.WriteLine($"[ERROR PostMensaje] Inner: {ex.InnerException.Message}");
+                    fullMessage += $" -> {ex.InnerException.Message}";
                 }
-                return StatusCode(500, $"Error interno al enviar mensaje: {ex.Message}");
+                return StatusCode(500, $"Error interno al enviar mensaje: {fullMessage}");
             }
         }
     }
