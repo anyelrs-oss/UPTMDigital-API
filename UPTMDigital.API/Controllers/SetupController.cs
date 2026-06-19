@@ -1179,6 +1179,15 @@ namespace UPTMDigital.API.Controllers
             });
         }
 
+        [HttpGet("diagnostic-asignaturas")]
+        public async Task<IActionResult> DiagnosticAsignaturas()
+        {
+            var list = await _context.Asignaturas
+                .Select(a => new { a.IdAsignatura, a.Nombre, a.Codigo })
+                .ToListAsync();
+            return Ok(list);
+        }
+
         // ── STATUS: Resumen del estado actual de la BD (tolerante a tablas faltantes) ──
         [HttpGet("status")]
         public async Task<IActionResult> Status()
