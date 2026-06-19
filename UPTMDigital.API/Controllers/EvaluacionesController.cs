@@ -43,6 +43,24 @@ namespace UPTMDigital.API.Controllers
         [HttpPost("bulk/{asignaturaId}")]
         public async Task<IActionResult> PostPlan(int asignaturaId, [FromBody] List<EvaluacionConfig> newConfigs)
         {
+            // 1. Validar que la asignatura existe
+            var asignaturaExists = await _context.Asignaturas.AnyAsync(a => a.IdAsignatura == asignaturaId);
+            if (!asignaturaExists)
+            {
+                return BadRequest($"Error de Validación: La asignaturaId {asignaturaId} recibida en la ruta no existe en la base de datos.");
+            }
+
+            if (newConfigs == null || newConfigs.Count == 0)
+            {
+                return BadRequest("Error: La lista de evaluaciones enviada está vacía.");
+            }
+
+            // 2. Limpiar relación para evitar conflictos de tracking
+            foreach (var config in newConfigs)
+            {
+                config.Asignatura = null;
+            }
+
             var executionStrategy = _context.Database.CreateExecutionStrategy();
 
             try
@@ -72,6 +90,7 @@ namespace UPTMDigital.API.Controllers
                             }
                             config.Activo = true;
                             config.IdEvaluacion = 0; // Forzar inserción
+                            config.Asignatura = null; // Doble confirmación
                             _context.EvaluacionesConfig.Add(config);
                         }
 
