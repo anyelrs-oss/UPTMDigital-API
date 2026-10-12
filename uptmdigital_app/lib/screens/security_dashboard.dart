@@ -8,6 +8,8 @@ import 'package:uptmdigital_app/widgets/institutional_card.dart';
 import 'package:uptmdigital_app/widgets/menu_bottom_sheet.dart';
 import 'package:uptmdigital_app/screens/security_checklist_screen.dart';
 import 'dart:async';
+import 'package:uptmdigital_app/services/notification_service.dart';
+import 'package:uptmdigital_app/widgets/notification_bell_button.dart';
 
 class SecurityDashboard extends StatefulWidget {
   const SecurityDashboard({super.key});
@@ -34,6 +36,7 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
     _loadAllData();
     _loadUserData();
     _startPolling();
+    NotificationService().initialize();
   }
 
   Future<void> _loadUserData() async {
@@ -167,13 +170,7 @@ class _SecurityDashboardState extends State<SecurityDashboard> {
         ),
         automaticallyImplyLeading: false,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_none),
-            onPressed: () {
-              // TODO: Implement notifications
-            },
-            tooltip: "Notificaciones",
-          ),
+          const NotificationBellButton(),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: _confirmLogout,

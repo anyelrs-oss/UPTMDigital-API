@@ -7,6 +7,7 @@ using Npgsql;
 using System.Reflection;
 using System.Text;
 using UPTMDigital.API.Data;
+using Pomelo.EntityFrameworkCore.MySql.Infrastructure;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -67,6 +68,26 @@ void ConfigurePostgres(DbContextOptionsBuilder options, string connectionString)
     });
 }
 
+void ConfigureMariaDb(DbContextOptionsBuilder options, string connectionString)
+{
+    if (string.IsNullOrWhiteSpace(connectionString))
+    {
+        // Allow app to start without Daree connection (graceful degradation).
+        options.UseMySql("Server=localhost", new MariaDbServerVersion(new Version(10, 4, 17)));
+        return;
+    }
+
+    var serverVersion = new MariaDbServerVersion(new Version(10, 4, 17));
+    options.UseMySql(connectionString, serverVersion, mySqlOptions =>
+    {
+        mySqlOptions.CommandTimeout(dbCommandTimeoutSeconds);
+        mySqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 3,
+            maxRetryDelay: TimeSpan.FromSeconds(10),
+            errorNumbersToAdd: null);
+    });
+}
+
 // 1. Conexión a la base de datos (App - Render / Supabase en producción)
 builder.Services.AddDbContext<UPTMDigitalContext>(options =>
     ConfigurePostgres(options, builder.Configuration.GetConnectionString("DefaultConnection") ?? string.Empty));
@@ -79,6 +100,34 @@ var nominaConnStr = useMirror
 
 builder.Services.AddDbContext<NominaContext>(options =>
     ConfigurePostgres(options, nominaConnStr ?? string.Empty));
+
+// 1.2 Conexión a Daree — Control de Estudios (MariaDB, solo lectura)
+var dareeEnabled = builder.Configuration.GetValue<bool>("DareeConfig:Enabled");
+string dareeConnStr = string.Empty;
+
+if (dareeEnabled)
+{
+    // Build connection string from individual keys to avoid parsing issues
+    // with special characters (e.g. '%' in password).
+    var csb = new MySqlConnector.MySqlConnectionStringBuilder
+    {
+        Server = builder.Configuration["DareeConfig:Server"] ?? "localhost",
+        Port = (uint)(builder.Configuration.GetValue<int?>("DareeConfig:Port") ?? 3306),
+        Database = builder.Configuration["DareeConfig:Database"] ?? "",
+        UserID = builder.Configuration["DareeConfig:User"] ?? "",
+        Password = builder.Configuration["DareeConfig:Password"] ?? "",
+        SslMode = MySqlConnector.MySqlSslMode.Preferred,
+        ConnectionTimeout = 30,
+        DefaultCommandTimeout = 45
+    };
+    dareeConnStr = csb.ConnectionString;
+}
+
+builder.Services.AddDbContext<DareeContext>(options =>
+{
+    ConfigureMariaDb(options, dareeConnStr);
+    options.UseQueryTrackingBehavior(Microsoft.EntityFrameworkCore.QueryTrackingBehavior.NoTracking);
+});
 
 // 2. Configuración JWT
 var jwtKey = builder.Configuration["Jwt:Key"];

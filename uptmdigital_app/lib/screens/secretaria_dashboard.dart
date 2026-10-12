@@ -6,6 +6,8 @@ import 'package:uptmdigital_app/screens/login_screen.dart';
 import 'package:uptmdigital_app/screens/reporte_asistencia_docente_screen.dart';
 import 'package:uptmdigital_app/widgets/menu_bottom_sheet.dart';
 import 'dart:convert';
+import 'package:uptmdigital_app/services/notification_service.dart';
+import 'package:uptmdigital_app/widgets/notification_bell_button.dart';
 
 class SecretariaDashboard extends StatefulWidget {
   const SecretariaDashboard({super.key});
@@ -17,16 +19,24 @@ class SecretariaDashboard extends StatefulWidget {
 class _SecretariaDashboardState extends State<SecretariaDashboard> {
   final _cedulaCtrl = TextEditingController();
   final _facturaCtrl = TextEditingController();
+  final _expedienteCedulaCtrl = TextEditingController();
   bool _isOfflineMode = false;
   List<Map<String, String>> _pendingSync = [];
   Map<String, dynamic>? _userData;
   bool _isLoading = false;
+
+  // Daree data
+  Map<String, dynamic>? _periodoActivo;
+  Map<String, dynamic>? _expedienteResult;
+  bool _isSearchingExpediente = false;
 
   @override
   void initState() {
     super.initState();
     _loadOfflineData();
     _loadUserData();
+    _loadDareeData();
+    NotificationService().initialize();
   }
 
   Future<void> _loadUserData() async {
@@ -35,6 +45,39 @@ class _SecretariaDashboardState extends State<SecretariaDashboard> {
       setState(() {
         _userData = data;
       });
+    }
+  }
+
+  Future<void> _loadDareeData() async {
+    try {
+      final periodo = await ApiService().getDareePeriodoActivo();
+      if (mounted && periodo != null) {
+        setState(() => _periodoActivo = periodo);
+      }
+    } catch (e) {
+      debugPrint('Secretaria Daree load error: $e');
+    }
+  }
+
+  Future<void> _buscarExpediente() async {
+    final cedula = _expedienteCedulaCtrl.text.trim();
+    if (cedula.isEmpty) return;
+    setState(() {
+      _isSearchingExpediente = true;
+      _expedienteResult = null;
+    });
+    try {
+      final result = await ApiService().getDareeDocenteDetalle(cedula);
+      // Try student profile too
+      // For now use docente endpoint which searches by cedula across the DB
+      if (mounted) {
+        setState(() {
+          _expedienteResult = result;
+          _isSearchingExpediente = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isSearchingExpediente = false);
     }
   }
 
@@ -146,6 +189,7 @@ class _SecretariaDashboardState extends State<SecretariaDashboard> {
         title: const Text("Portal de Secretaría"),
         automaticallyImplyLeading: false,
         actions: [
+          const NotificationBellButton(),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: _confirmLogout,
@@ -191,6 +235,125 @@ class _SecretariaDashboardState extends State<SecretariaDashboard> {
                     ],
                   ),
                 ),
+
+                // Periodo Activo (Daree)
+                if (_periodoActivo != null)
+                  InstitutionalCard(
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: AppTheme.secondary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.calendar_today, color: AppTheme.secondary, size: 22),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Periodo Activo', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                              Text(
+                                _periodoActivo!['nombre'] ?? _periodoActivo!['codigo'] ?? 'Sin periodo',
+                                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            _periodoActivo!['fase'] ?? '',
+                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                // Consulta de Expediente (Daree)
+                InstitutionalCard(
+                  title: "Consulta de Expediente",
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _expedienteCedulaCtrl,
+                              decoration: const InputDecoration(
+                                labelText: "Cédula a consultar",
+                                prefixIcon: Icon(Icons.search),
+                                isDense: true,
+                              ),
+                              onSubmitted: (_) => _buscarExpediente(),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            onPressed: _isSearchingExpediente ? null : _buscarExpediente,
+                            child: _isSearchingExpediente 
+                              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Text("BUSCAR"),
+                          ),
+                        ],
+                      ),
+                      if (_expedienteResult != null && _expedienteResult!['data'] != null) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.green.shade200),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "${_expedienteResult!['data']['nombres'] ?? ''} ${_expedienteResult!['data']['apellidos'] ?? ''}".trim(),
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                              ),
+                              const SizedBox(height: 4),
+                              if (_expedienteResult!['data']['profesion'] != null)
+                                Text("Profesión: ${_expedienteResult!['data']['profesion']}", style: const TextStyle(fontSize: 12)),
+                              if (_expedienteResult!['data']['especialidad'] != null)
+                                Text("Especialidad: ${_expedienteResult!['data']['especialidad']}", style: const TextStyle(fontSize: 12)),
+                              if (_expedienteResult!['data']['pnfNombre'] != null)
+                                Text("PNF: ${_expedienteResult!['data']['pnfNombre']}", style: const TextStyle(fontSize: 12)),
+                              if (_expedienteResult!['data']['correo'] != null)
+                                Text("Correo: ${_expedienteResult!['data']['correo']}", style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                            ],
+                          ),
+                        ),
+                      ] else if (_expedienteResult != null && _expedienteResult!['data'] == null) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.shade50,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.info_outline, color: Colors.orange, size: 18),
+                              SizedBox(width: 8),
+                              Text("No se encontró registro con esa cédula.", style: TextStyle(fontSize: 13)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+
                 InstitutionalCard(
                   title: "Reportes Administrativos",
                   child: Column(

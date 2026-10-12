@@ -18,6 +18,8 @@ import 'package:uptmdigital_app/screens/pines_docentes_screen.dart';
 import 'package:uptmdigital_app/widgets/institutional_card.dart';
 
 import 'package:uptmdigital_app/screens/carnet_screen.dart';
+import 'package:uptmdigital_app/services/notification_service.dart';
+import 'package:uptmdigital_app/widgets/notification_bell_button.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -28,11 +30,14 @@ class AdminDashboard extends StatefulWidget {
 
 class _AdminDashboardState extends State<AdminDashboard> {
   Map<String, dynamic>? _adminData;
+  Map<String, dynamic>? _periodoActivo;
 
   @override
   void initState() {
     super.initState();
     _loadAdminData();
+    _loadDareeData();
+    NotificationService().initialize();
   }
 
   Future<void> _loadAdminData() async {
@@ -41,6 +46,17 @@ class _AdminDashboardState extends State<AdminDashboard> {
       setState(() {
         _adminData = data;
       });
+    }
+  }
+
+  Future<void> _loadDareeData() async {
+    try {
+      final periodo = await ApiService().getDareePeriodoActivo();
+      if (mounted && periodo != null) {
+        setState(() => _periodoActivo = periodo);
+      }
+    } catch (e) {
+      debugPrint('Admin Daree load error: $e');
     }
   }
 
@@ -57,6 +73,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         ),
         automaticallyImplyLeading: false,
         actions: [
+          const NotificationBellButton(),
           if (_adminData != null)
             IconButton(
               icon: const Icon(Icons.badge_outlined),
@@ -92,6 +109,50 @@ class _AdminDashboardState extends State<AdminDashboard> {
               ),
             ),
           const SizedBox(height: 12),
+
+          // --- DAREE: PERIODO ACTIVO ---
+          if (_periodoActivo != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: InstitutionalCard(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppTheme.secondary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.calendar_today, color: AppTheme.secondary, size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Periodo Académico Activo (Daree)', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                          Text(
+                            _periodoActivo!['nombre'] ?? _periodoActivo!['codigo'] ?? 'Sin periodo',
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        _periodoActivo!['fase'] ?? '',
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
 
           // --- PERSONAS ---
           _SectionHeader(icon: Icons.people, title: "Personas"),

@@ -5,6 +5,8 @@ import 'package:uptmdigital_app/services/supabase_service.dart';
 import 'package:uptmdigital_app/screens/login_screen.dart';
 import 'package:uptmdigital_app/screens/inbox_screen.dart';
 import 'package:uptmdigital_app/screens/noticias_list_screen.dart';
+import 'package:uptmdigital_app/screens/pensum_screen.dart';
+import 'package:uptmdigital_app/helpers/cedula_helper.dart';
 import 'package:uptmdigital_app/widgets/anuncios_carousel.dart';
 import 'package:uptmdigital_app/widgets/student_progress.dart';
 import 'package:uptmdigital_app/widgets/institutional_card.dart';
@@ -15,6 +17,8 @@ import 'package:uptmdigital_app/screens/my_grades_screen.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'dart:convert';
+import 'package:uptmdigital_app/services/notification_service.dart';
+import 'package:uptmdigital_app/widgets/notification_bell_button.dart';
 
 
 class StudentDashboard extends StatefulWidget {
@@ -29,10 +33,56 @@ class _StudentDashboardState extends State<StudentDashboard> {
   Map<String, dynamic>? _studentData;
   bool _isLoading = true;
 
+  // Daree data
+  Map<String, dynamic>? _periodoActivo;
+  Map<String, dynamic>? _miPnf;
+  Map<String, dynamic>? _dareeProfile;
+
   @override
   void initState() {
     super.initState();
     _loadStudentData();
+    NotificationService().initialize();
+  }
+
+  Future<void> _loadDareeData() async {
+    final api = ApiService();
+    try {
+      // Parallel load: periodo + perfil (independent calls)
+      final results = await Future.wait([
+        api.getDareePeriodoActivo(),
+        api.getDareePerfilEstudiante(),
+      ]);
+
+      final periodo = results[0] as Map<String, dynamic>?;
+      final perfil = results[1] as Map<String, dynamic>?;
+
+      // Map student's carrera to their PNF (depends on _studentData)
+      Map<String, dynamic>? pnf;
+      final carrera = _studentData?['carrera'] as String?;
+      if (carrera != null && carrera.isNotEmpty) {
+        pnf = await api.getDareeMiPnf(carrera);
+      }
+
+      // Fallback: if no match, try first PNF from list
+      if (pnf == null) {
+        final pnfs = await api.getDareePnfs();
+        if (pnfs.isNotEmpty) {
+          pnf = pnfs.first as Map<String, dynamic>?;
+        }
+      }
+
+      // Single setState for all Daree data
+      if (mounted) {
+        setState(() {
+          _periodoActivo = periodo;
+          if (perfil != null) _dareeProfile = perfil;
+          if (pnf != null) _miPnf = pnf;
+        });
+      }
+    } catch (e) {
+      debugPrint('Daree data load error: $e');
+    }
   }
 
   Future<void> _loadStudentData() async {
@@ -66,11 +116,15 @@ class _StudentDashboardState extends State<StudentDashboard> {
         _studentData = data;
         _isLoading = false;
       });
+      // Load Daree data after student data is available (needs carrera name)
+      _loadDareeData();
     } else if (mounted && _studentData == null) {
       // Solo marcamos como no cargando si no había caché y falló la red
       setState(() {
         _isLoading = false;
       });
+      // Still try loading Daree data without carrera (will use fallback)
+      _loadDareeData();
     }
   }
 
@@ -226,13 +280,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
         title: Text(title),
         automaticallyImplyLeading: false, 
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_none),
-            onPressed: () {
-              // TODO: Implement notifications
-            },
-            tooltip: "Notificaciones",
-          ),
+          const NotificationBellButton(),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: _confirmLogout,
@@ -323,22 +371,103 @@ class _StudentDashboardState extends State<StudentDashboard> {
             ),
           ),
 
-        // 2. Academic Progress
+        // 2. Periodo Activo (Daree)
+        if (_periodoActivo != null)
+          InstitutionalCard(
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.secondary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.calendar_today, color: AppTheme.secondary, size: 24),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Periodo Activo', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                      Text(
+                        _periodoActivo!['nombre'] ?? _periodoActivo!['codigo'] ?? 'Sin periodo',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    _periodoActivo!['fase'] ?? '',
+                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+        // 3. Mi Pensum Quick Action
+        if (_miPnf != null)
+          InstitutionalCard(
+            child: InkWell(
+              onTap: () {
+                Navigator.push(context, MaterialPageRoute(
+                  builder: (_) => PensumScreen(
+                    pnfId: _miPnf!['id'],
+                    pnfNombre: _miPnf!['nombre'],
+                    pnfColorHex: _miPnf!['colorHex'],
+                  ),
+                ));
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.teal.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.school, color: Colors.teal, size: 24),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Mi Pensum', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                        Text('Consulta tu malla curricular', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right, color: Colors.grey),
+                ],
+              ),
+            ),
+          ),
+
+        // 4. Academic Progress
         InstitutionalCard(
           title: "Mi Progreso",
           child: StudentProgress(studentId: _studentData!['idEstudiante']),
         ),
 
-        // 3. Upcoming Evaluations
+        // 5. Upcoming Evaluations
         InstitutionalCard(
           title: "Próximas Evaluaciones",
           child: UpcomingEvaluations(studentId: _studentData!['idEstudiante']),
         ),
 
-        // 4. News / Announcements
+        // 6. News / Announcements
         InstitutionalCard(
           title: "Noticias Institucionales",
-          padding: EdgeInsets.zero, // Carousel handles its own padding
+          padding: EdgeInsets.zero,
           child: Column(
             children: [
                const SizedBox(height: 8),
@@ -346,10 +475,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                const SizedBox(height: 16),
                TextButton(
                  onPressed: () {
-                   setState(() {
-                     // El menu FAB tiene noticias, pero si queremos navegar desde aquí:
-                     Navigator.push(context, MaterialPageRoute(builder: (_) => const NoticiasListScreen()));
-                   });
+                   Navigator.push(context, MaterialPageRoute(builder: (_) => const NoticiasListScreen()));
                  },
                  child: const Text("Ver todas las noticias"),
                ),
@@ -401,7 +527,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                 style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               Text(
-                _studentData!['cedula'],
+                "C.I: ${CedulaHelper.toDisplayFormat(_studentData!['cedula'])}",
                 style: TextStyle(color: Colors.grey[600]),
               ),
               const SizedBox(height: 16),
@@ -418,9 +544,17 @@ class _StudentDashboardState extends State<StudentDashboard> {
           title: "Información Académica",
           child: Column(
             children: [
-              _buildProfileRow("Carrera", _studentData!['carrera'] ?? "N/A"),
-              _buildProfileRow("Semestre", "N/A"), // Placeholder
-              _buildProfileRow("Índice", "N/A"), // Placeholder
+              _buildProfileRow("PNF", _dareeProfile?['pnfNombre'] ?? _studentData!['carrera'] ?? "N/A"),
+              _buildProfileRow("Trayecto", _dareeProfile?['trayecto'] ?? "N/A"),
+              _buildProfileRow("Trimestre", _dareeProfile?['trimestre'] ?? "N/A"),
+              _buildProfileRow("Código", _dareeProfile?['codigoAlumno'] ?? "N/A"),
+              _buildProfileRow("Estatus", _dareeProfile?['estatus'] ?? "N/A"),
+              _buildProfileRow("Periodo", _periodoActivo?['nombre'] ?? _periodoActivo?['codigo'] ?? "N/A"),
+              _buildProfileRow("Fase", _periodoActivo?['fase'] ?? "N/A"),
+              if (_dareeProfile?['expedienteEstado'] != null)
+                _buildProfileRow("Expediente", _dareeProfile!['expedienteEstado']),
+              if (_dareeProfile?['modalidad'] != null)
+                _buildProfileRow("Modalidad", _dareeProfile!['modalidad']),
             ],
           ),
         ),
@@ -429,12 +563,40 @@ class _StudentDashboardState extends State<StudentDashboard> {
           title: "Información de Contacto",
           child: Column(
             children: [
-              _buildProfileRow("Dirección", _studentData!['direccion'] ?? "N/A"),
-              _buildProfileRow("Teléfono", _studentData!['telefono'] ?? "N/A"),
-              _buildProfileRow("Correo", _studentData!['correoInstitucional'] ?? "N/A"),
+              _buildProfileRow("Dirección", _dareeProfile?['direccion'] ?? _studentData!['direccion'] ?? "N/A"),
+              _buildProfileRow("Teléfono", _dareeProfile?['tlfMov'] ?? _studentData!['telefono'] ?? "N/A"),
+              _buildProfileRow("Correo", _dareeProfile?['correo'] ?? _studentData!['correoInstitucional'] ?? "N/A"),
+              if (_dareeProfile?['resEstado'] != null)
+                _buildProfileRow("Estado", _dareeProfile!['resEstado']),
+              if (_dareeProfile?['resMunicipio'] != null)
+                _buildProfileRow("Municipio", _dareeProfile!['resMunicipio']),
             ],
           ),
         ),
+
+        // Emergency contact from Daree
+        if (_dareeProfile?['refNombre'] != null && _dareeProfile!['refNombre'].toString().isNotEmpty)
+          InstitutionalCard(
+            title: "Contacto de Emergencia",
+            child: Column(
+              children: [
+                _buildProfileRow("Nombre", _dareeProfile!['refNombre'] ?? "N/A"),
+                _buildProfileRow("Teléfono", _dareeProfile!['refTelefono'] ?? "N/A"),
+              ],
+            ),
+          ),
+
+        // Work info from Daree
+        if (_dareeProfile?['trabaja'] == 'S')
+          InstitutionalCard(
+            title: "Información Laboral",
+            child: Column(
+              children: [
+                _buildProfileRow("Empresa", _dareeProfile!['empresaNombre'] ?? "N/A"),
+                _buildProfileRow("Traslado", _dareeProfile!['medioTraslado'] ?? "N/A"),
+              ],
+            ),
+          ),
       ],
     );
   }

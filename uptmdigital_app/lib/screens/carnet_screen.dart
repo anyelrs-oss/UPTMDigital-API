@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'dart:convert';
+import 'package:uptmdigital_app/helpers/cedula_helper.dart';
+import 'package:uptmdigital_app/services/api_service.dart';
 
 class CarnetScreen extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -13,11 +15,13 @@ class CarnetScreen extends StatefulWidget {
 }
 
 class _CarnetScreenState extends State<CarnetScreen> {
+  Map<String, dynamic>? _dareeProfile;
+
   @override
   void initState() {
     super.initState();
-    // Fase 8: Bloquear capturas de pantalla para seguridad del carnet
     _enableSecurity();
+    _loadDareeProfile();
   }
 
   @override
@@ -26,13 +30,18 @@ class _CarnetScreenState extends State<CarnetScreen> {
     super.dispose();
   }
 
+  Future<void> _loadDareeProfile() async {
+    final perfil = await ApiService().getDareePerfilEstudiante();
+    if (mounted && perfil != null) {
+      setState(() => _dareeProfile = perfil);
+    }
+  }
+
   Future<void> _enableSecurity() async {
-    // Solo funciona en Android nativo, pero preparamos el llamado
     await SystemChannels.platform.invokeMethod('SystemChrome.setEnabledSystemUIMode', []);
   }
 
   Future<void> _disableSecurity() async {
-    // Restaurar permisos de captura al salir
   }
 
   @override
@@ -44,13 +53,14 @@ class _CarnetScreenState extends State<CarnetScreen> {
       "id": widget.userData['idEstudiante'] ?? widget.userData['idProfesor'] ?? widget.userData['idCoordinador'] ?? widget.userData['idUsuario'],
       "cedula": widget.userData['cedula'],
       "role": role,
+      "codigoAlumno": _dareeProfile?['codigoAlumno'],
       "solvente": esSolvente,
       "generated_at": DateTime.now().toIso8601String(),
     });
 
     String infoAcademica = "UPTM DIGITAL";
     if (role == 'Estudiante') {
-      infoAcademica = widget.userData['carrera'] ?? 'ESTUDIANTE';
+      infoAcademica = _dareeProfile?['pnfNombre'] ?? widget.userData['carrera'] ?? 'ESTUDIANTE';
     } else if (role == 'Profesor') {
       infoAcademica = widget.userData['departamento'] ?? 'PROFESOR';
     } else if (role == 'Coordinador') {
@@ -138,9 +148,34 @@ class _CarnetScreenState extends State<CarnetScreen> {
                         ),
                         const SizedBox(height: 5),
                         Text(
-                          "C.I: ${widget.userData['cedula']}",
+                          "C.I: ${CedulaHelper.toDisplayFormat(widget.userData['cedula'])}",
                           style: const TextStyle(color: Colors.white70, fontSize: 16),
                         ),
+                        // Código alumno from Daree
+                        if (role == 'Estudiante' && _dareeProfile?['codigoAlumno'] != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              "Cód: ${_dareeProfile!['codigoAlumno']}",
+                              style: const TextStyle(color: Colors.white54, fontSize: 13),
+                            ),
+                          ),
+                        // Trayecto badge
+                        if (role == 'Estudiante' && _dareeProfile?['trayecto'] != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.white12,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                "${_dareeProfile!['trayecto']} • ${_dareeProfile?['trimestre'] ?? ''}",
+                                style: const TextStyle(color: Colors.white60, fontSize: 11, fontWeight: FontWeight.w500),
+                              ),
+                            ),
+                          ),
                         const SizedBox(height: 15),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -172,9 +207,9 @@ class _CarnetScreenState extends State<CarnetScreen> {
                           ),
                         ),
                         const SizedBox(height: 10),
-                        const Text(
-                          "Válido hasta: Dic 2025",
-                          style: TextStyle(color: Colors.white54, fontSize: 12),
+                        Text(
+                          "Válido: Periodo ${DateTime.now().year}",
+                          style: const TextStyle(color: Colors.white54, fontSize: 12),
                         ),
                         const SizedBox(height: 30),
                       ],

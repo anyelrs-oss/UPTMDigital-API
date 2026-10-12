@@ -1273,6 +1273,397 @@ class ApiService {
   Future<void> _clearCacheByPrefix(String prefix) async {
     _memoryCache.removeWhere((key, _) => key.startsWith(prefix));
   }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // DAREE — Control de Estudios (MariaDB remoto, solo lectura)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /// Health check de conexión a Daree.
+  Future<Map<String, dynamic>?> getDareeHealth() async {
+    try {
+      final response = await _dio.get('/api/daree/health');
+      if (response.statusCode == 200) return response.data;
+      return null;
+    } catch (e) {
+      debugPrint('Daree health error: $e');
+      return null;
+    }
+  }
+
+  /// Lista de PNFs (carreras) activos.
+  Future<List<dynamic>> getDareePnfs() async {
+    const cacheKey = 'daree_pnfs';
+    final cached = await _getCached<List<dynamic>>(cacheKey);
+    if (cached != null) return cached;
+
+    try {
+      final response = await _dio.get('/api/daree/pnfs');
+      final data = response.data['data'] as List<dynamic>? ?? [];
+      await _setCached(cacheKey, data, ttl: const Duration(hours: 1));
+      return data;
+    } catch (e) {
+      debugPrint('Daree PNFs error: $e');
+      return [];
+    }
+  }
+
+  /// Malla curricular (pensum) de un PNF específico.
+  Future<Map<String, dynamic>?> getDareePensum(int pnfId) async {
+    final cacheKey = 'daree_pensum_$pnfId';
+    final cached = await _getCached<Map<String, dynamic>>(cacheKey);
+    if (cached != null) return cached;
+
+    try {
+      final response = await _dio.get('/api/daree/pensum/$pnfId');
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        final result = response.data as Map<String, dynamic>;
+        await _setCached(cacheKey, result, ttl: const Duration(hours: 2));
+        return result;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Daree Pensum error: $e');
+      return null;
+    }
+  }
+
+  /// Periodo académico activo.
+  Future<Map<String, dynamic>?> getDareePeriodoActivo() async {
+    const cacheKey = 'daree_periodo_activo';
+    final cached = await _getCached<Map<String, dynamic>>(cacheKey);
+    if (cached != null) return cached;
+
+    try {
+      final response = await _dio.get('/api/daree/periodo-activo');
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        final data = response.data['data'] as Map<String, dynamic>;
+        await _setCached(cacheKey, data, ttl: const Duration(minutes: 30));
+        return data;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Daree Periodo error: $e');
+      return null;
+    }
+  }
+
+  /// Secciones académicas con filtros opcionales.
+  Future<List<dynamic>> getDareeSecciones({int? pnfId, String? periodo, String? trayecto}) async {
+    try {
+      final params = <String, dynamic>{};
+      if (pnfId != null) params['pnfId'] = pnfId;
+      if (periodo != null) params['periodo'] = periodo;
+      if (trayecto != null) params['trayecto'] = trayecto;
+
+      final response = await _dio.get('/api/daree/secciones', queryParameters: params);
+      return response.data['data'] as List<dynamic>? ?? [];
+    } catch (e) {
+      debugPrint('Daree Secciones error: $e');
+      return [];
+    }
+  }
+
+  /// Horarios de todas las secciones de un PNF en el periodo activo.
+  Future<List<dynamic>> getDareeHorariosPnf(int pnfId) async {
+    try {
+      final response = await _dio.get('/api/daree/horarios-pnf/$pnfId');
+      return response.data['data'] as List<dynamic>? ?? [];
+    } catch (e) {
+      debugPrint('Daree Horarios PNF error: $e');
+      return [];
+    }
+  }
+
+  /// Cadena de prerrequisitos (prelaciones) de un PNF.
+  Future<List<dynamic>> getDareePrelaciones(int pnfId) async {
+    final cacheKey = 'daree_prelaciones_$pnfId';
+    final cached = await _getCached<List<dynamic>>(cacheKey);
+    if (cached != null) return cached;
+
+    try {
+      final response = await _dio.get('/api/daree/prelaciones/$pnfId');
+      final data = response.data['data'] as List<dynamic>? ?? [];
+      await _setCached(cacheKey, data, ttl: const Duration(hours: 2));
+      return data;
+    } catch (e) {
+      debugPrint('Daree Prelaciones error: $e');
+      return [];
+    }
+  }
+
+  /// Catálogo de aulas activas.
+  Future<List<dynamic>> getDareeAulas() async {
+    const cacheKey = 'daree_aulas';
+    final cached = await _getCached<List<dynamic>>(cacheKey);
+    if (cached != null) return cached;
+
+    try {
+      final response = await _dio.get('/api/daree/aulas');
+      final data = response.data['data'] as List<dynamic>? ?? [];
+      await _setCached(cacheKey, data, ttl: const Duration(hours: 1));
+      return data;
+    } catch (e) {
+      debugPrint('Daree Aulas error: $e');
+      return [];
+    }
+  }
+
+  /// Mapea la carrera UPTM del estudiante al PNF correspondiente en Daree.
+  /// GET /api/daree/mi-pnf?carrera={carreraNombre}
+  /// Returns: { id, codigo, nombre, colorHex, totalUcs, totalCreditos } or null
+  Future<Map<String, dynamic>?> getDareeMiPnf(String carreraNombre) async {
+    final cacheKey = 'daree_mi_pnf_${carreraNombre.toLowerCase().replaceAll(' ', '_')}';
+    final cached = await _getCached(cacheKey);
+    if (cached != null) return cached as Map<String, dynamic>;
+
+    try {
+      final response = await _dio.get('/api/daree/mi-pnf', queryParameters: {'carrera': carreraNombre});
+      final data = response.data['data'] as Map<String, dynamic>?;
+      if (data != null) {
+        await _setCached(cacheKey, data, ttl: const Duration(hours: 24));
+      }
+      return data;
+    } catch (e) {
+      debugPrint('Daree MiPnf error: $e');
+      return null;
+    }
+  }
+
+  /// Notas del estudiante logueado desde Daree (inscripciones_notas).
+  /// GET /api/daree/mis-notas
+  /// Returns list of: { codigoUc, nombreUc, c1, c2, c3, c4, definitiva, asistencia, estatusMateria, periodo, ... }
+  Future<List<dynamic>> getDareeMisNotas() async {
+    const cacheKey = 'daree_mis_notas';
+    final cached = await _getCached(cacheKey);
+    if (cached != null) return cached as List<dynamic>;
+
+    try {
+      final response = await _dio.get('/api/daree/mis-notas');
+      final data = response.data['data'] as List<dynamic>? ?? [];
+      await _setCached(cacheKey, data, ttl: const Duration(minutes: 15));
+      return data;
+    } catch (e) {
+      debugPrint('Daree MisNotas error: $e');
+      return [];
+    }
+  }
+
+  /// Notas por cédula (para coordinadores/admin).
+  /// GET /api/daree/notas-por-cedula?cedula=29652018
+  Future<List<dynamic>> getDareeNotasPorCedula(String cedula) async {
+    try {
+      final response = await _dio.get('/api/daree/notas-por-cedula', queryParameters: {'cedula': cedula});
+      return response.data['data'] as List<dynamic>? ?? [];
+    } catch (e) {
+      debugPrint('Daree NotasPorCedula error: $e');
+      return [];
+    }
+  }
+
+  /// Perfil completo del estudiante desde Daree.
+  /// GET /api/daree/mi-perfil-daree
+  /// Returns: { nombres, apellidos, trayecto, trimestre, pnfNombre, codigoAlumno, ... }
+  Future<Map<String, dynamic>?> getDareePerfilEstudiante() async {
+    const cacheKey = 'daree_mi_perfil';
+    final cached = await _getCached(cacheKey);
+    if (cached != null) return cached as Map<String, dynamic>;
+
+    try {
+      final response = await _dio.get('/api/daree/mi-perfil-daree');
+      final data = response.data['data'] as Map<String, dynamic>?;
+      if (data != null) {
+        await _setCached(cacheKey, data, ttl: const Duration(hours: 1));
+      }
+      return data;
+    } catch (e) {
+      debugPrint('Daree PerfilEstudiante error: $e');
+      return null;
+    }
+  }
+
+  /// Materias inscritas en el periodo activo con notas parciales.
+  /// GET /api/daree/mis-inscripciones
+  /// Returns list of: { codigoUc, nombreUc, docenteNombre, horario, c1-c4, definitiva, ... }
+  Future<Map<String, dynamic>?> getDareeMisInscripciones() async {
+    const cacheKey = 'daree_mis_inscripciones';
+    final cached = await _getCached(cacheKey);
+    if (cached != null) return cached as Map<String, dynamic>;
+
+    try {
+      final response = await _dio.get('/api/daree/mis-inscripciones');
+      final data = response.data as Map<String, dynamic>?;
+      if (data != null) {
+        await _setCached(cacheKey, data, ttl: const Duration(minutes: 30));
+      }
+      return data;
+    } catch (e) {
+      debugPrint('Daree MisInscripciones error: $e');
+      return null;
+    }
+  }
+
+  /// Historial académico completo con promedio ponderado.
+  /// GET /api/daree/mi-historial
+  /// Returns: { resumen: { promedioPonderado, creditosAprobados, ... }, porTrayecto: [...], data: [...] }
+  Future<Map<String, dynamic>?> getDareeMiHistorial() async {
+    const cacheKey = 'daree_mi_historial';
+    final cached = await _getCached(cacheKey);
+    if (cached != null) return cached as Map<String, dynamic>;
+
+    try {
+      final response = await _dio.get('/api/daree/mi-historial');
+      final data = response.data as Map<String, dynamic>?;
+      if (data != null) {
+        await _setCached(cacheKey, data, ttl: const Duration(hours: 1));
+      }
+      return data;
+    } catch (e) {
+      debugPrint('Daree MiHistorial error: $e');
+      return null;
+    }
+  }
+
+  // ─── Bloque C: Docentes, Asistencias, Evaluaciones ──────────
+
+  /// Directorio de docentes, opcionalmente filtrado por PNF.
+  /// GET /api/daree/docentes?pnfId=X
+  Future<List<dynamic>> getDareeDocentes({int? pnfId}) async {
+    final cacheKey = 'daree_docentes_${pnfId ?? 'all'}';
+    final cached = await _getCached(cacheKey);
+    if (cached != null) return cached as List<dynamic>;
+
+    try {
+      final params = <String, dynamic>{};
+      if (pnfId != null) params['pnfId'] = pnfId;
+      final response = await _dio.get('/api/daree/docentes', queryParameters: params);
+      final data = response.data['data'] as List<dynamic>? ?? [];
+      await _setCached(cacheKey, data, ttl: const Duration(hours: 1));
+      return data;
+    } catch (e) {
+      debugPrint('Daree Docentes error: $e');
+      return [];
+    }
+  }
+
+  /// Detalle de un docente con su carga académica.
+  /// GET /api/daree/docente/{cedula}
+  Future<Map<String, dynamic>?> getDareeDocenteDetalle(String cedula) async {
+    try {
+      final response = await _dio.get('/api/daree/docente/$cedula');
+      return response.data as Map<String, dynamic>?;
+    } catch (e) {
+      debugPrint('Daree DocenteDetalle error: $e');
+      return null;
+    }
+  }
+
+  /// Asistencias del estudiante logueado.
+  /// Sin seccionId: resumen por materia. Con seccionId: detalle de esa materia.
+  /// GET /api/daree/mis-asistencias?seccionId=X
+  Future<Map<String, dynamic>?> getDareeMisAsistencias({String? seccionId}) async {
+    final cacheKey = 'daree_asistencias_${seccionId ?? 'resumen'}';
+    final cached = await _getCached(cacheKey);
+    if (cached != null) return cached as Map<String, dynamic>;
+
+    try {
+      final params = <String, dynamic>{};
+      if (seccionId != null) params['seccionId'] = seccionId;
+      final response = await _dio.get('/api/daree/mis-asistencias', queryParameters: params);
+      final data = response.data as Map<String, dynamic>?;
+      if (data != null) {
+        await _setCached(cacheKey, data, ttl: const Duration(minutes: 30));
+      }
+      return data;
+    } catch (e) {
+      debugPrint('Daree MisAsistencias error: $e');
+      return null;
+    }
+  }
+
+  /// Plan de evaluación de una sección (parciales, trabajos, porcentajes).
+  /// GET /api/daree/evaluaciones/{seccionId}
+  Future<Map<String, dynamic>?> getDareeEvaluaciones(String seccionId) async {
+    final cacheKey = 'daree_evals_$seccionId';
+    final cached = await _getCached(cacheKey);
+    if (cached != null) return cached as Map<String, dynamic>;
+
+    try {
+      final response = await _dio.get('/api/daree/evaluaciones/$seccionId');
+      final data = response.data as Map<String, dynamic>?;
+      if (data != null) {
+        await _setCached(cacheKey, data, ttl: const Duration(hours: 1));
+      }
+      return data;
+    } catch (e) {
+      debugPrint('Daree Evaluaciones error: $e');
+      return null;
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // NOTIFICACIONES
+  // ═══════════════════════════════════════════════════════════════
+
+  /// Obtiene todas las notificaciones del usuario autenticado.
+  /// GET /api/notificaciones/me
+  Future<List<dynamic>> getNotificaciones() async {
+    try {
+      final response = await _dio.get('/api/notificaciones/me');
+      return (response.data as List<dynamic>?) ?? [];
+    } catch (e) {
+      debugPrint('Notificaciones error: $e');
+      return [];
+    }
+  }
+
+  /// Conteo de notificaciones no leídas.
+  /// GET /api/notificaciones/me/no-leidas
+  /// Returns: { total: int }
+  Future<int> getNotificacionesNoLeidas() async {
+    try {
+      final response = await _dio.get('/api/notificaciones/me/no-leidas');
+      return (response.data['total'] as int?) ?? 0;
+    } catch (e) {
+      debugPrint('Notificaciones no leidas error: $e');
+      return 0;
+    }
+  }
+
+  /// Marca una notificación como leída.
+  /// POST /api/notificaciones/me/{id}/leer
+  Future<bool> marcarNotificacionLeida(int id) async {
+    try {
+      await _dio.post('/api/notificaciones/me/$id/leer');
+      return true;
+    } catch (e) {
+      debugPrint('Marcar leida error: $e');
+      return false;
+    }
+  }
+
+  /// Marca TODAS las notificaciones como leídas.
+  /// POST /api/notificaciones/me/leer-todas
+  Future<bool> marcarTodasNotificacionesLeidas() async {
+    try {
+      await _dio.post('/api/notificaciones/me/leer-todas');
+      return true;
+    } catch (e) {
+      debugPrint('Marcar todas leidas error: $e');
+      return false;
+    }
+  }
+
+  /// Elimina una notificación.
+  /// DELETE /api/notificaciones/me/{id}
+  Future<bool> eliminarNotificacion(int id) async {
+    try {
+      await _dio.delete('/api/notificaciones/me/$id');
+      return true;
+    } catch (e) {
+      debugPrint('Eliminar notificacion error: $e');
+      return false;
+    }
+  }
 }
 
 /// Cache entry with TTL support

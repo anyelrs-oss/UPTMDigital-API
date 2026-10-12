@@ -21,6 +21,9 @@ import 'package:uptmdigital_app/screens/evaluar_screen.dart';
 import 'package:uptmdigital_app/screens/plan_evaluacion_screen.dart';
 import 'package:uptmdigital_app/screens/academic_hierarchy_screen.dart';
 import 'package:uptmdigital_app/screens/subject_selection_screen.dart';
+import 'package:uptmdigital_app/screens/pensum_screen.dart';
+import 'package:uptmdigital_app/screens/mi_asistencia_screen.dart';
+import 'package:uptmdigital_app/screens/mis_evaluaciones_screen.dart';
 
 class MenuBottomSheet extends StatelessWidget {
   final String role; // 'admin', 'student', 'professor', 'security'
@@ -182,6 +185,37 @@ class MenuBottomSheet extends StatelessWidget {
                    notImpl();
                  }
               }},
+              {'icon': Icons.school, 'label': 'Mi Pensum', 'onTap': () async {
+                 final api = ApiService();
+                 Map<String, dynamic>? pnf;
+
+                 // Try student-specific mapping first
+                 final carrera = userData?['carrera'] as String?;
+                 if (carrera != null && carrera.isNotEmpty) {
+                   pnf = await api.getDareeMiPnf(carrera);
+                 }
+
+                 // Fallback to first PNF
+                 if (pnf == null) {
+                   final pnfs = await api.getDareePnfs();
+                   if (pnfs.isNotEmpty) pnf = pnfs.first as Map<String, dynamic>?;
+                 }
+
+                 if (pnf != null && context.mounted) {
+                   Navigator.pop(context);
+                   Navigator.push(context, MaterialPageRoute(
+                     builder: (_) => PensumScreen(
+                       pnfId: pnf!['id'],
+                       pnfNombre: pnf['nombre'],
+                       pnfColorHex: pnf['colorHex'],
+                     ),
+                   ));
+                 } else {
+                   notImpl();
+                 }
+              }},
+              {'icon': Icons.fact_check_outlined, 'label': 'Mi Asistencia', 'onTap': () => nav(const MiAsistenciaScreen())},
+              {'icon': Icons.assignment_outlined, 'label': 'Evaluaciones', 'onTap': () => nav(const MisEvaluacionesScreen())},
             ]
           },
           {

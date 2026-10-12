@@ -10,6 +10,7 @@ import 'package:uptmdigital_app/screens/notas_screen.dart';
 import 'package:uptmdigital_app/screens/asistencias_screen.dart';
 import 'package:uptmdigital_app/widgets/anuncios_carousel.dart';
 import 'package:uptmdigital_app/services/notification_service.dart';
+import 'package:uptmdigital_app/widgets/notification_bell_button.dart';
  // For Clipboard
 import 'package:uptmdigital_app/screens/horarios_screen.dart';
 import 'package:uptmdigital_app/screens/inbox_screen.dart';
@@ -33,6 +34,10 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
   Map<String, dynamic>? _professorData;
   bool _isLoading = true;
 
+  // Daree data
+  Map<String, dynamic>? _dareeDocente;
+  Map<String, dynamic>? _periodoActivo;
+
   @override
   void initState() {
     super.initState();
@@ -55,6 +60,7 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
         _professorData = jsonDecode(cached);
         _isLoading = false;
       });
+      _loadDareeData(); // Start Daree loading early
     }
 
     // 2. Cargar de red para actualizar
@@ -63,9 +69,7 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
     // Fallback: Si no tiene el perfil de profesor en /me, intentar recuperarlo
     if (mounted && data != null && data['idProfesor'] == null) {
       debugPrint("ProfessorDashboard: idProfesor null en /me, intentando fallback");
-      final professorProfile = await api.getCoordinadorMe(); // El coordinador suele compartir datos de profesor o tener endpoint similar
-      // Nota: Si no hay un endpoint específico getProfessorMe, usaremos la data que tengamos.
-      // Pero idealmente el backend debería ya haber linkeado.
+      await api.getCoordinadorMe();
     }
 
     if (mounted && data != null) {
@@ -73,10 +77,33 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
         _professorData = data;
         _isLoading = false;
       });
+      _loadDareeData();
     } else if (mounted && _professorData == null) {
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _loadDareeData() async {
+    final api = ApiService();
+    try {
+      // Load periodo activo
+      final periodo = await api.getDareePeriodoActivo();
+      if (mounted && periodo != null) {
+        setState(() => _periodoActivo = periodo);
+      }
+
+      // Load docente detail from Daree (carga académica, profesión, etc.)
+      final cedula = _professorData?['cedula'] as String?;
+      if (cedula != null && cedula.isNotEmpty) {
+        final docente = await api.getDareeDocenteDetalle(cedula);
+        if (mounted && docente != null) {
+          setState(() => _dareeDocente = docente);
+        }
+      }
+    } catch (e) {
+      debugPrint('Professor Daree load error: $e');
     }
   }
 
@@ -233,6 +260,7 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
         title: Text("Prof. ${_professorData!['nombres']} ${_professorData!['apellidos']}"),
         automaticallyImplyLeading: false,
         actions: [
+          const NotificationBellButton(),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: _confirmLogout,
@@ -358,6 +386,27 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
                             color: Colors.grey[600],
                           ),
                     ),
+                    // Daree enrichment: profesión y especialidad
+                    if (_dareeDocente?['data'] != null) ...[
+                      if (_dareeDocente!['data']['profesion'] != null)
+                        Text(
+                          _dareeDocente!['data']['profesion'],
+                          style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                        ),
+                      if (_dareeDocente!['data']['especialidad'] != null)
+                        Container(
+                          margin: const EdgeInsets.only(top: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            _dareeDocente!['data']['especialidad'],
+                            style: const TextStyle(fontSize: 10, color: AppTheme.primary, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                    ],
                   ],
                 ),
               ),
@@ -369,17 +418,136 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
           ),
         ),
 
+        // 2. Periodo Activo
+        if (_periodoActivo != null)
+          InstitutionalCard(
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.secondary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.calendar_today, color: AppTheme.secondary, size: 24),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Periodo Activo', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                      Text(
+                        _periodoActivo!['nombre'] ?? _periodoActivo!['codigo'] ?? 'Sin periodo',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    _periodoActivo!['fase'] ?? '',
+                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                  ),
+                ),
+              ],
+            ),
+          ),
 
+        // 3. Carga Académica (Daree)
+        if (_dareeDocente != null && (_dareeDocente!['cargaAcademica'] as List<dynamic>?)?.isNotEmpty == true)
+          InstitutionalCard(
+            title: "Mi Carga Académica",
+            child: Column(
+              children: [
+                // Summary row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildCargaStat("Secciones", "${(_dareeDocente!['cargaAcademica'] as List).length}", AppTheme.primary),
+                    _buildCargaStat(
+                      "Estudiantes",
+                      "${(_dareeDocente!['cargaAcademica'] as List).fold<int>(0, (sum, s) => sum + ((s['inscritos'] as int?) ?? 0))}",
+                      AppTheme.secondary,
+                    ),
+                  ],
+                ),
+                const Divider(height: 24),
+                // Section list
+                ...(_dareeDocente!['cargaAcademica'] as List<dynamic>).map((s) => Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: AppTheme.secondary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.class_, size: 20, color: AppTheme.secondary),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              s['nombreUc'] ?? 'N/A',
+                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                            ),
+                            Text(
+                              "${s['trayecto'] ?? ''} • Sec. ${s['letraSeccion'] ?? ''} • ${s['aula'] ?? 'S/A'}",
+                              style: TextStyle(color: Colors.grey[600], fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Column(
+                        children: [
+                          Text(
+                            "${s['inscritos'] ?? 0}",
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary, fontSize: 16),
+                          ),
+                          Icon(Icons.people, size: 14, color: Colors.grey[400]),
+                        ],
+                      ),
+                    ],
+                  ),
+                )),
+              ],
+            ),
+          ),
 
-        // 3. News
+        // 4. News
         InstitutionalCard(
           title: "Noticias Institucionales",
-          padding: EdgeInsets.zero, // Carousel handles padding or full width
+          padding: EdgeInsets.zero,
           child: const Padding(
             padding: EdgeInsets.only(bottom: 16.0),
             child: AnunciosCarousel(),
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildCargaStat(String label, String value, Color color) {
+    return Column(
+      children: [
+        Text(value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color)),
+        Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
       ],
     );
   }

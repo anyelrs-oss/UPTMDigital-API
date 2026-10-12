@@ -12,10 +12,12 @@ namespace UPTMDigital.API.Controllers
     public class MensajesController : ControllerBase
     {
         private readonly UPTMDigitalContext _context;
+        private readonly IServiceScopeFactory _scopeFactory;
 
-        public MensajesController(UPTMDigitalContext context)
+        public MensajesController(UPTMDigitalContext context, IServiceScopeFactory scopeFactory)
         {
             _context = context;
+            _scopeFactory = scopeFactory;
         }
 
         /// <summary>
@@ -189,6 +191,7 @@ namespace UPTMDigital.API.Controllers
 
         /// <summary>
         /// Envía un mensaje en el chat (Asignatura, Carrera o Privado).
+        /// Al guardar, crea Notificaciones para los destinatarios.
         /// </summary>
         [Authorize]
         [HttpPost]
@@ -214,6 +217,15 @@ namespace UPTMDigital.API.Controllers
                 _context.Mensajes.Add(mensaje);
                 await _context.SaveChangesAsync();
 
+                // --- Crear notificaciones en segundo plano (no bloquear respuesta) ---
+                var scopeFactory = _scopeFactory;
+                _ = Task.Run(async () =>
+                {
+                    using var scope = scopeFactory.CreateScope();
+                    var db = scope.ServiceProvider.GetRequiredService<UPTMDigitalContext>();
+                    await _crearNotificacionesBackground(db, mensaje);
+                });
+
                 return Ok(mensaje);
             }
             catch (Exception ex)
@@ -227,6 +239,101 @@ namespace UPTMDigital.API.Controllers
                     fullMessage += $" -> {ex.InnerException.Message}";
                 }
                 return StatusCode(500, $"Error interno al enviar mensaje: {fullMessage}");
+            }
+        }
+
+        /// <summary>
+        /// Crea notificaciones en BD para los destinatarios de un mensaje (ejecutado en background).
+        /// </summary>
+        private static async Task _crearNotificacionesBackground(UPTMDigitalContext _context, Mensaje mensaje)
+        {
+            try
+            {
+                var preview = mensaje.Contenido?.Length > 80
+                    ? mensaje.Contenido.Substring(0, 80) + "..."
+                    : mensaje.Contenido ?? "";
+                var emisor = mensaje.EmisorNombre ?? "Alguien";
+
+                var recipientIds = new List<int>();
+
+                if (mensaje.TipoChat == "Privado" && mensaje.ReceptorUsuarioId.HasValue)
+                {
+                    // Chat privado: notificar al receptor
+                    recipientIds.Add(mensaje.ReceptorUsuarioId.Value);
+                }
+                else if (mensaje.TipoChat == "Carrera" && mensaje.CarreraId.HasValue)
+                {
+                    // Chat de carrera: notificar a estudiantes + profesores + coordinador
+                    var estudianteIds = await _context.Estudiantes
+                        .Where(e => e.CarreraId == mensaje.CarreraId.Value && e.UsuarioId != null)
+                        .Select(e => e.UsuarioId!.Value)
+                        .ToListAsync();
+                    recipientIds.AddRange(estudianteIds);
+
+                    var coordIds = await _context.Coordinadores
+                        .Where(c => c.CarreraId == mensaje.CarreraId.Value)
+                        .Select(c => c.UsuarioId)
+                        .ToListAsync();
+                    recipientIds.AddRange(coordIds);
+
+                    // Profesores del departamento de la carrera
+                    var carrera = await _context.Carreras.FindAsync(mensaje.CarreraId.Value);
+                    if (carrera != null)
+                    {
+                        var profIds = await _context.Profesores
+                            .Where(p => p.Departamento == carrera.Nombre && p.UsuarioId != null)
+                            .Select(p => p.UsuarioId!.Value)
+                            .ToListAsync();
+                        recipientIds.AddRange(profIds);
+                    }
+                }
+                else if (mensaje.TipoChat == "Asignatura" && mensaje.AsignaturaId.HasValue)
+                {
+                    // Chat de asignatura: notificar a inscritos + profesor
+                    var inscritosIds = await _context.Inscripciones
+                        .Where(i => i.AsignaturaId == mensaje.AsignaturaId.Value && i.Estudiante != null && i.Estudiante.UsuarioId != null)
+                        .Select(i => i.Estudiante!.UsuarioId!.Value)
+                        .ToListAsync();
+                    recipientIds.AddRange(inscritosIds);
+
+                    var asignatura = await _context.Asignaturas.FindAsync(mensaje.AsignaturaId.Value);
+                    if (asignatura?.ProfesorId != null)
+                    {
+                        var profUserId = await _context.Profesores
+                            .Where(p => p.IdProfesor == asignatura.ProfesorId && p.UsuarioId != null)
+                            .Select(p => p.UsuarioId!.Value)
+                            .FirstOrDefaultAsync();
+                        if (profUserId > 0) recipientIds.Add(profUserId);
+                    }
+                }
+
+                // Quitar al emisor y duplicados
+                recipientIds = recipientIds
+                    .Where(id => id != mensaje.UsuarioId && id > 0)
+                    .Distinct()
+                    .ToList();
+
+                // Crear notificaciones (batch)
+                var notificaciones = recipientIds.Select(rid => new Notificacion
+                {
+                    UsuarioId = rid,
+                    Titulo = $"💬 {emisor}",
+                    Cuerpo = preview,
+                    Tipo = "Chat",
+                    Leida = false,
+                    FechaCreacion = DateTime.UtcNow,
+                }).ToList();
+
+                if (notificaciones.Any())
+                {
+                    _context.Notificaciones.AddRange(notificaciones);
+                    await _context.SaveChangesAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                // No bloquear el envío del mensaje si falla la notificación
+                Console.WriteLine($"[WARN] Error creando notificaciones: {ex.Message}");
             }
         }
     }

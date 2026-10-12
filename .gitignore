@@ -24,6 +24,7 @@ Thumbs.db
 
 ## Log files
 *.log
+*.apk
 UPTMDigital_Workspace/
 .idea/
 uptmdigital_app/android/app/src/assets/

@@ -30,14 +30,20 @@ namespace UPTMDigital.API.Controllers
         /// Retorna todas las notificaciones del usuario autenticado.
         /// </summary>
         [HttpGet("me")]
-        public async Task<ActionResult<IEnumerable<Notificacion>>> GetMisNotificaciones()
+        public async Task<ActionResult<IEnumerable<Notificacion>>> GetMisNotificaciones([FromQuery] int page = 1, [FromQuery] int limit = 30)
         {
             var userId = GetUserId();
             if (userId == null) return Unauthorized();
 
+            if (limit > 50) limit = 50;
+            if (page < 1) page = 1;
+
             var notificaciones = await _context.Notificaciones
+                .AsNoTracking()
                 .Where(n => n.UsuarioId == userId)
                 .OrderByDescending(n => n.FechaCreacion)
+                .Skip((page - 1) * limit)
+                .Take(limit)
                 .ToListAsync();
 
             return Ok(notificaciones);
@@ -86,13 +92,11 @@ namespace UPTMDigital.API.Controllers
             var userId = GetUserId();
             if (userId == null) return Unauthorized();
 
-            var pendientes = await _context.Notificaciones
+            var count = await _context.Notificaciones
                 .Where(n => n.UsuarioId == userId && !n.Leida)
-                .ToListAsync();
+                .ExecuteUpdateAsync(s => s.SetProperty(n => n.Leida, true));
 
-            pendientes.ForEach(n => n.Leida = true);
-            await _context.SaveChangesAsync();
-            return Ok(new { message = $"{pendientes.Count} notificaciones marcadas como leídas." });
+            return Ok(new { message = $"{count} notificaciones marcadas como leídas." });
         }
 
         /// <summary>

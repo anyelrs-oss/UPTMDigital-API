@@ -222,82 +222,22 @@ class _ProfesoresScreenState extends State<ProfesoresScreen> {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
-            const SizedBox(height: 20),
-            Stack(
-              children: [
-                CircleAvatar(
-                  radius: 50,
-                  backgroundColor: AppTheme.secondary.withValues(alpha: 0.1),
-                  backgroundImage: p.profileImageUrl != null ? NetworkImage(p.profileImageUrl!) : null,
-                  child: p.profileImageUrl == null ? const Icon(Icons.school, size: 50, color: AppTheme.secondary) : null,
-                ),
-                if (p.profileImageUrl != null)
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: CircleAvatar(
-                      backgroundColor: Colors.red,
-                      radius: 18,
-                      child: IconButton(
-                        icon: const Icon(Icons.delete_forever, size: 18, color: Colors.white),
-                        onPressed: () => _confirmRemoveImage(p),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Text("${p.nombres} ${p.apellidos}", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            Text(p.departamento, style: const TextStyle(color: Colors.grey)),
-            const Divider(height: 32),
-            _detailRow(Icons.badge, "Cédula", p.cedula),
-            _detailRow(Icons.email, "Correo", p.correoInstitucional),
-            _detailRow(Icons.phone, "Teléfono", p.telefono ?? "No registrado"),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () async {
-                      Navigator.pop(context);
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => ProfessorFormScreen(profesor: p)),
-                      );
-                      if (result == true) _loadProfesores();
-                    },
-                    icon: const Icon(Icons.edit),
-                    label: const Text("EDITAR PERFIL"),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+      builder: (context) => _ProfessorDetailSheet(
+        profesor: p,
+        onEdit: () async {
+          Navigator.pop(context);
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => ProfessorFormScreen(profesor: p)),
+          );
+          if (result == true) _loadProfesores();
+        },
+        onRemoveImage: () => _confirmRemoveImage(p),
       ),
     );
   }
 
-  Widget _detailRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: Colors.grey),
-          const SizedBox(width: 12),
-          Text("$label:", style: const TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(width: 8),
-          Text(value),
-        ],
-      ),
-    );
-  }
+
 
   void _confirmRemoveImage(Profesor p) async {
     final reasonCtrl = TextEditingController();
@@ -353,5 +293,218 @@ class _ProfesoresScreenState extends State<ProfesoresScreen> {
     } else if (confirm == true && reasonCtrl.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Debe proporcionar un motivo"), backgroundColor: Colors.orange));
     }
+  }
+}
+
+/// Stateful bottom sheet that loads Daree enrichment data for a professor
+class _ProfessorDetailSheet extends StatefulWidget {
+  final Profesor profesor;
+  final VoidCallback onEdit;
+  final VoidCallback onRemoveImage;
+
+  const _ProfessorDetailSheet({
+    required this.profesor,
+    required this.onEdit,
+    required this.onRemoveImage,
+  });
+
+  @override
+  State<_ProfessorDetailSheet> createState() => _ProfessorDetailSheetState();
+}
+
+class _ProfessorDetailSheetState extends State<_ProfessorDetailSheet> {
+  Map<String, dynamic>? _dareeData;
+  bool _isLoadingDaree = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDareeData();
+  }
+
+  Future<void> _loadDareeData() async {
+    final data = await ApiService().getDareeDocenteDetalle(widget.profesor.cedula);
+    if (mounted) {
+      setState(() {
+        _dareeData = data;
+        _isLoadingDaree = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.profesor;
+    final daree = _dareeData?['data'] as Map<String, dynamic>?;
+    final carga = _dareeData?['cargaAcademica'] as List<dynamic>? ?? [];
+    final periodo = _dareeData?['periodo'] as String?;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
+          const SizedBox(height: 20),
+          Stack(
+            children: [
+              CircleAvatar(
+                radius: 50,
+                backgroundColor: AppTheme.secondary.withValues(alpha: 0.1),
+                backgroundImage: p.profileImageUrl != null ? NetworkImage(p.profileImageUrl!) : null,
+                child: p.profileImageUrl == null ? const Icon(Icons.school, size: 50, color: AppTheme.secondary) : null,
+              ),
+              if (p.profileImageUrl != null)
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: CircleAvatar(
+                    backgroundColor: Colors.red,
+                    radius: 18,
+                    child: IconButton(
+                      icon: const Icon(Icons.delete_forever, size: 18, color: Colors.white),
+                      onPressed: widget.onRemoveImage,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text("${p.nombres} ${p.apellidos}", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          Text(p.departamento, style: const TextStyle(color: Colors.grey)),
+
+          // Daree enrichment: profesión y especialidad
+          if (daree != null) ...[
+            if (daree['profesion'] != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(daree['profesion'], style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+              ),
+            if (daree['especialidad'] != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    daree['especialidad'],
+                    style: const TextStyle(fontSize: 11, color: AppTheme.primary, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+          ],
+
+          const Divider(height: 32),
+          _detailRow(Icons.badge, "Cédula", p.cedula),
+          _detailRow(Icons.email, "Correo", daree?['correo'] ?? p.correoInstitucional),
+          _detailRow(Icons.phone, "Teléfono", daree?['telefono'] ?? p.telefono ?? "No registrado"),
+          if (daree?['pnfNombre'] != null)
+            _detailRow(Icons.school, "PNF", daree!['pnfNombre']),
+
+          // Carga académica from Daree
+          if (_isLoadingDaree)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2)),
+            )
+          else if (carga.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                const Icon(Icons.class_, size: 18, color: AppTheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  "Carga Académica ${periodo ?? ''}",
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppTheme.secondary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    "${carga.length} secciones",
+                    style: const TextStyle(fontSize: 11, color: AppTheme.secondary, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ...carga.take(5).map((s) => Container(
+              margin: const EdgeInsets.only(bottom: 6),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          s['nombreUc'] ?? 'N/A',
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                        ),
+                        Text(
+                          "${s['trayecto'] ?? ''} • Sec. ${s['letraSeccion'] ?? ''} • ${s['aula'] ?? 'S/A'}",
+                          style: TextStyle(color: Colors.grey[600], fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    "${s['inscritos'] ?? 0}",
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(Icons.people, size: 14, color: Colors.grey[400]),
+                ],
+              ),
+            )),
+            if (carga.length > 5)
+              Text(
+                "... y ${carga.length - 5} más",
+                style: TextStyle(color: Colors.grey[500], fontSize: 12),
+              ),
+          ],
+
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: widget.onEdit,
+                  icon: const Icon(Icons.edit),
+                  label: const Text("EDITAR PERFIL"),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _detailRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: Colors.grey),
+          const SizedBox(width: 12),
+          Text("$label:", style: const TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(width: 8),
+          Expanded(child: Text(value, overflow: TextOverflow.ellipsis)),
+        ],
+      ),
+    );
   }
 }

@@ -6,6 +6,10 @@ import 'package:uptmdigital_app/widgets/institutional_card.dart';
 import 'package:uptmdigital_app/screens/login_screen.dart';
 import 'package:uptmdigital_app/screens/inbox_screen.dart';
 import 'package:uptmdigital_app/screens/anuncios_admin_screen.dart';
+import 'package:uptmdigital_app/screens/pensum_screen.dart';
+import 'package:uptmdigital_app/screens/profesores_screen.dart';
+import 'package:uptmdigital_app/services/notification_service.dart';
+import 'package:uptmdigital_app/widgets/notification_bell_button.dart';
 
 import 'package:uptmdigital_app/widgets/menu_bottom_sheet.dart';
 
@@ -21,10 +25,16 @@ class _CoordinatorDashboardState extends State<CoordinatorDashboard> {
   Map<String, dynamic>? _coordData;
   bool _isLoading = true;
 
+  // Daree data
+  Map<String, dynamic>? _miPnf;
+  Map<String, dynamic>? _periodoActivo;
+  List<dynamic> _docentesPnf = [];
+
   @override
   void initState() {
     super.initState();
     _loadData();
+    NotificationService().initialize();
   }
 
   Future<void> _loadData() async {
@@ -34,6 +44,37 @@ class _CoordinatorDashboardState extends State<CoordinatorDashboard> {
         _coordData = data;
         _isLoading = false;
       });
+      _loadDareeData();
+    }
+  }
+
+  Future<void> _loadDareeData() async {
+    final api = ApiService();
+    try {
+      // Periodo activo
+      final periodo = await api.getDareePeriodoActivo();
+      if (mounted && periodo != null) {
+        setState(() => _periodoActivo = periodo);
+      }
+
+      // Mapear carrera del coordinador a PNF de Daree
+      final carrera = _coordData?['carrera']?['nombre'] as String?;
+      if (carrera != null && carrera.isNotEmpty) {
+        final pnf = await api.getDareeMiPnf(carrera);
+        if (mounted && pnf != null) {
+          setState(() => _miPnf = pnf);
+          
+          // Cargar docentes del PNF
+          final pnfIdRaw = pnf['id'];
+          final pnfIdInt = pnfIdRaw is int ? pnfIdRaw : int.tryParse(pnfIdRaw.toString());
+          final docentes = await api.getDareeDocentes(pnfId: pnfIdInt);
+          if (mounted) {
+            setState(() => _docentesPnf = docentes);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Coordinator Daree load error: $e');
     }
   }
 
@@ -47,7 +88,19 @@ class _CoordinatorDashboardState extends State<CoordinatorDashboard> {
     switch (_currentIndex) {
       case 0: activePage = _buildHomeTab(); break;
       case 1: activePage = const InboxScreen(); title = "Comunicación"; break;
-      case 2: activePage = const Center(child: Text("Gestión de Horarios (Excel)")); title = "Horarios"; break;
+      case 2: 
+        if (_miPnf != null) {
+          activePage = PensumScreen(
+            pnfId: _miPnf!['id'],
+            pnfNombre: _miPnf!['nombre'] ?? 'Mi PNF',
+            pnfColorHex: _miPnf!['colorHex'],
+          );
+          title = "Pensum ${_miPnf!['nombre'] ?? ''}";
+        } else {
+          activePage = const Center(child: Text("Cargando información del PNF..."));
+          title = "Pensum";
+        }
+        break;
       default: activePage = _buildHomeTab();
     }
 
@@ -55,6 +108,7 @@ class _CoordinatorDashboardState extends State<CoordinatorDashboard> {
       appBar: AppBar(
         title: Text(title),
         actions: [
+          const NotificationBellButton(),
           IconButton(icon: const Icon(Icons.logout), onPressed: _confirmLogout),
         ],
       ),
@@ -80,7 +134,7 @@ class _CoordinatorDashboardState extends State<CoordinatorDashboard> {
             _buildNavItemSimple(Icons.home, "Inicio", 0),
             const SizedBox(width: 48), // FAB
             _buildNavItemSimple(Icons.chat, "Chats", 1),
-            _buildNavItemSimple(Icons.calendar_month, "Horarios", 2),
+            _buildNavItemSimple(Icons.menu_book, "Pensum", 2),
           ],
         ),
       ),
@@ -108,16 +162,78 @@ class _CoordinatorDashboardState extends State<CoordinatorDashboard> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        // 1. Mi PNF (from Daree)
         InstitutionalCard(
           title: "Mi Carrera",
           child: ListTile(
-            leading: const CircleAvatar(child: Icon(Icons.school)),
-            title: Text(_coordData?['carrera']?['nombre'] ?? "Carrera no asignada"),
-            subtitle: const Text("Coordinador Académico"),
+            contentPadding: EdgeInsets.zero,
+            leading: CircleAvatar(
+              backgroundColor: _miPnf != null 
+                ? AppTheme.primary.withValues(alpha: 0.1)
+                : Colors.grey.shade200,
+              child: const Icon(Icons.school, color: AppTheme.primary),
+            ),
+            title: Text(
+              _miPnf?['nombre'] ?? _coordData?['carrera']?['nombre'] ?? "Carrera no asignada",
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text("Coordinador Académico"),
+                if (_miPnf?['codigo'] != null)
+                  Text("Código: ${_miPnf!['codigo']}", style: TextStyle(color: Colors.grey[500], fontSize: 11)),
+              ],
+            ),
           ),
         ),
+
+        // 2. Periodo Activo
+        if (_periodoActivo != null)
+          InstitutionalCard(
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.secondary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.calendar_today, color: AppTheme.secondary, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Periodo Activo', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                      Text(
+                        _periodoActivo!['nombre'] ?? _periodoActivo!['codigo'] ?? 'Sin periodo',
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    _periodoActivo!['fase'] ?? '',
+                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+        // 3. PIN Generator
         _buildPinGenerator(),
         const SizedBox(height: 10),
+
+        // 4. Quick actions (enriched)
         _buildQuickActions(),
       ],
     );
@@ -150,7 +266,25 @@ class _CoordinatorDashboardState extends State<CoordinatorDashboard> {
       crossAxisSpacing: 10,
       children: [
         _ActionCard(icon: Icons.campaign, label: "Crear Anuncio", color: Colors.orange, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AnunciosAdminScreen()))),
-        _ActionCard(icon: Icons.groups, label: "Mis Voceros", color: Colors.blue, onTap: () {}),
+        _ActionCard(
+          icon: Icons.people,
+          label: "Docentes (${_docentesPnf.length})",
+          color: Colors.blue,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfesoresScreen())),
+        ),
+        if (_miPnf != null)
+          _ActionCard(
+            icon: Icons.menu_book,
+            label: "Ver Pensum",
+            color: Colors.teal,
+            onTap: () => Navigator.push(context, MaterialPageRoute(
+              builder: (_) => PensumScreen(
+                pnfId: _miPnf!['id'],
+                pnfNombre: _miPnf!['nombre'] ?? 'Mi PNF',
+                pnfColorHex: _miPnf!['colorHex'],
+              ),
+            )),
+          ),
       ],
     );
   }
