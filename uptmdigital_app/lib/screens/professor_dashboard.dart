@@ -52,12 +52,15 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
 
   Future<void> _loadProfessorData() async {
     final api = ApiService();
+    String? loadedCedula;
 
     // 1. Cargar de caché primero
     final cached = await api.storage.read(key: 'cached_user_me');
     if (cached != null && mounted) {
+      final cachedMap = jsonDecode(cached) as Map<String, dynamic>;
+      loadedCedula = cachedMap['cedula'] as String?;
       setState(() {
-        _professorData = jsonDecode(cached);
+        _professorData = cachedMap;
         _isLoading = false;
       });
       _loadDareeData(); // Start Daree loading early
@@ -73,11 +76,15 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
     }
 
     if (mounted && data != null) {
+      final newCedula = data['cedula'] as String?;
       setState(() {
         _professorData = data;
         _isLoading = false;
       });
-      _loadDareeData();
+      // Solo recargar Daree si no se había iniciado desde caché o cambió la cédula
+      if (loadedCedula == null || loadedCedula != newCedula) {
+        _loadDareeData();
+      }
     } else if (mounted && _professorData == null) {
       setState(() {
         _isLoading = false;
@@ -88,19 +95,22 @@ class _ProfessorDashboardState extends State<ProfessorDashboard> {
   Future<void> _loadDareeData() async {
     final api = ApiService();
     try {
-      // Load periodo activo
-      final periodo = await api.getDareePeriodoActivo();
-      if (mounted && periodo != null) {
-        setState(() => _periodoActivo = periodo);
-      }
-
-      // Load docente detail from Daree (carga académica, profesión, etc.)
       final cedula = _professorData?['cedula'] as String?;
-      if (cedula != null && cedula.isNotEmpty) {
-        final docente = await api.getDareeDocenteDetalle(cedula);
-        if (mounted && docente != null) {
-          setState(() => _dareeDocente = docente);
-        }
+      final futures = <Future<dynamic>>[
+        api.getDareePeriodoActivo(),
+        if (cedula != null && cedula.isNotEmpty)
+          api.getDareeDocenteDetalle(cedula),
+      ];
+
+      final results = await Future.wait(futures);
+      final periodo = results[0] as Map<String, dynamic>?;
+      final docente = results.length > 1 ? results[1] as Map<String, dynamic>? : null;
+
+      if (mounted) {
+        setState(() {
+          if (periodo != null) _periodoActivo = periodo;
+          if (docente != null) _dareeDocente = docente;
+        });
       }
     } catch (e) {
       debugPrint('Professor Daree load error: $e');

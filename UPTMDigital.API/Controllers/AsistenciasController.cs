@@ -20,9 +20,17 @@ namespace UPTMDigital.API.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Asistencia>>> GetAsistencias([FromQuery] int? estudianteId)
+        public async Task<ActionResult<IEnumerable<Asistencia>>> GetAsistencias(
+            [FromQuery] int? estudianteId,
+            [FromQuery] int? asignaturaId,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 200)
         {
+            if (page < 1) page = 1;
+            if (pageSize < 1 || pageSize > 500) pageSize = 200;
+
             var query = _context.Asistencias
+                .AsNoTracking()
                 .Include(a => a.Estudiante)
                 .Include(a => a.Asignatura)
                 .AsQueryable();
@@ -30,7 +38,14 @@ namespace UPTMDigital.API.Controllers
             if (estudianteId.HasValue)
                 query = query.Where(a => a.EstudianteId == estudianteId.Value);
 
-            return await query.ToListAsync();
+            if (asignaturaId.HasValue)
+                query = query.Where(a => a.AsignaturaId == asignaturaId.Value);
+
+            return await query
+                .OrderByDescending(a => a.Fecha)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
         }
 
         [HttpGet("{id}")]

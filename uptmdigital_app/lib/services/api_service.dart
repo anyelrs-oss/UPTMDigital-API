@@ -1548,9 +1548,17 @@ class ApiService {
   /// Detalle de un docente con su carga académica.
   /// GET /api/daree/docente/{cedula}
   Future<Map<String, dynamic>?> getDareeDocenteDetalle(String cedula) async {
+    final cacheKey = 'daree_docente_$cedula';
+    final cached = await _getCached(cacheKey);
+    if (cached != null) return cached as Map<String, dynamic>;
+
     try {
       final response = await _dio.get('/api/daree/docente/$cedula');
-      return response.data as Map<String, dynamic>?;
+      final data = response.data as Map<String, dynamic>?;
+      if (data != null) {
+        await _setCached(cacheKey, data, ttl: const Duration(minutes: 30));
+      }
+      return data;
     } catch (e) {
       debugPrint('Daree DocenteDetalle error: $e');
       return null;

@@ -1,14 +1,16 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:uptmdigital_app/services/api_service.dart';
 
 /// Servicio de notificaciones con polling periódico y notificaciones locales.
 /// Singleton que expone [unreadCount] como ValueNotifier para badges reactivos.
-class NotificationService {
+class NotificationService with WidgetsBindingObserver {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
   NotificationService._internal();
+
+  static const int _chatNotificationId = 1001;
 
   final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
@@ -24,6 +26,8 @@ class NotificationService {
   Future<void> initialize() async {
     if (_initialized) return;
     _initialized = true;
+
+    WidgetsBinding.instance.addObserver(this);
 
     // Configurar flutter_local_notifications
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -59,6 +63,19 @@ class NotificationService {
     _startPolling();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!_initialized) return;
+    if (state == AppLifecycleState.resumed) {
+      checkForNewNotifications();
+      _startPolling();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _pollTimer?.cancel();
+      _pollTimer = null;
+    }
+  }
+
   void _startPolling() {
     _pollTimer?.cancel();
     _pollTimer = Timer.periodic(const Duration(seconds: 30), (_) {
@@ -68,6 +85,7 @@ class NotificationService {
 
   /// Detiene el polling (al cerrar sesión).
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _pollTimer?.cancel();
     _pollTimer = null;
     _initialized = false;
@@ -134,7 +152,7 @@ class NotificationService {
     );
 
     await _localNotifications.show(
-      DateTime.now().millisecondsSinceEpoch ~/ 1000, // unique id
+      _chatNotificationId,
       title,
       body,
       details,

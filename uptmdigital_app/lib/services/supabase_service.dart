@@ -16,8 +16,10 @@ class SupabaseService {
   }) {
     late StreamController<List<Mensaje>> controller;
     Timer? timer;
+    int lastCount = -1;
+    int lastMaxId = -1;
 
-    void fetchMessages() async {
+    void fetchMessages({bool forceEmit = false}) async {
       try {
         List<Mensaje> msgs = [];
         if (asignaturaId != null) {
@@ -28,7 +30,12 @@ class SupabaseService {
           msgs = await ApiService().getMensajesCarrera(carreraId);
         }
         if (!controller.isClosed) {
-          controller.add(msgs);
+          final currentMaxId = msgs.isEmpty ? 0 : msgs.last.idMensaje;
+          if (forceEmit || msgs.length != lastCount || currentMaxId != lastMaxId) {
+            lastCount = msgs.length;
+            lastMaxId = currentMaxId;
+            controller.add(msgs);
+          }
         }
       } catch (e) {
         // Ignorar errores de red temporales en el polling
@@ -37,8 +44,8 @@ class SupabaseService {
 
     controller = StreamController<List<Mensaje>>(
       onListen: () {
-        fetchMessages(); // Carga inicial inmediata
-        timer = Timer.periodic(const Duration(seconds: 3), (t) {
+        fetchMessages(forceEmit: true); // Carga inicial inmediata
+        timer = Timer.periodic(const Duration(seconds: 10), (t) {
           fetchMessages();
         });
       },
